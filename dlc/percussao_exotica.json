@@ -1,0 +1,9 @@
+{
+  "instrumentos": {
+    "djembe": { "label": "Djembê", "price": 250 },
+    "conga": { "label": "Conga", "price": 300 }
+  },
+  "servicos": {
+    "gravacao_ao_vivo": { "label": "Gravação ao vivo de percussão", "price": 400 }
+  }
+}

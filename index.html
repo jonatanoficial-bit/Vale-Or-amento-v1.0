@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerador de Orçamento &ndash; Vale Produções</title>
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css" />
+    <!-- jsPDF CDN for PDF generation -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Main application scripts -->
+    <script defer type="module" src="js/main.js"></script>
+</head>
+<body>
+    <header class="app-header">
+        <img src="assets/logo.png" alt="Logo da Vale Produções" class="logo" />
+        <h1>Gerador de Orçamento</h1>
+    </header>
+    <main>
+        <form id="quoteForm">
+            <section class="card">
+                <h2>Dados do Cliente</h2>
+                <div class="form-group">
+                    <label for="clientName">Nome do cliente*</label>
+                    <input type="text" id="clientName" name="clientName" placeholder="Ex.: João Silva" required />
+                </div>
+                <div class="form-group">
+                    <label for="clientEmail">E‑mail*</label>
+                    <input type="email" id="clientEmail" name="clientEmail" placeholder="Ex.: cliente@email.com" required />
+                </div>
+                <div class="form-group">
+                    <label for="clientPhone">Telefone</label>
+                    <input type="tel" id="clientPhone" name="clientPhone" placeholder="(xx) xxxxx‑xxxx" />
+                </div>
+            </section>
+            <section class="card">
+                <h2>Detalhes da Produção</h2>
+                <div class="form-group">
+                    <label for="productionType">Tipo de produção</label>
+                    <select id="productionType" name="productionType">
+                        <option value="banda">Banda completa</option>
+                        <option value="solo">Artista solo</option>
+                        <option value="instrumental">Instrumental</option>
+                        <option value="outro">Outro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="vocals">Número de vozes</label>
+                    <input type="number" id="vocals" name="vocals" min="0" value="1" />
+                </div>
+                <div class="form-group instruments-section">
+                    <h3>Instrumentos</h3>
+                    <p>Selecione os instrumentos e quantidades:</p>
+                    <div id="instrumentList" class="instrument-list"></div>
+                </div>
+                <div class="form-group services-section">
+                    <h3>Serviços adicionais</h3>
+                    <div id="serviceList" class="service-list"></div>
+                </div>
+            </section>
+            <section class="card">
+                <h2>Observações</h2>
+                <div class="form-group">
+                    <label for="notes">Descreva quaisquer informações adicionais que julgar importantes</label>
+                    <textarea id="notes" name="notes" rows="4" placeholder="Ex.: Referências musicais, necessidades especiais..."></textarea>
+                </div>
+            </section>
+            <div class="action-bar">
+                <button type="button" id="generateQuote" class="primary-btn">Gerar Orçamento em PDF</button>
+                <div id="totalCost" class="total-cost"></div>
+            </div>
+        </form>
+        <div id="feedback" class="feedback" hidden></div>
+    </main>
+    <footer class="app-footer">
+        <p>© <span id="currentYear"></span> Vale Produções &ndash; Todos os direitos reservados.</p>
+        <a href="admin.html" class="admin-link">Área Administrativa</a>
+    </footer>
+</body>
+</html>

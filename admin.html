@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Área Administrativa &ndash; Vale Produções</title>
+    <link rel="stylesheet" href="css/style.css" />
+    <script defer type="module" src="js/admin.js"></script>
+</head>
+<body>
+    <header class="app-header">
+        <img src="assets/logo.png" alt="Logo da Vale Produções" class="logo" />
+        <h1>Área Administrativa</h1>
+    </header>
+    <main>
+        <!-- Login Screen -->
+        <div id="adminLogin" class="card">
+            <h2>Acesso ao Administrador</h2>
+            <p>Insira a senha para acessar as ferramentas de administração.</p>
+            <div class="form-group">
+                <label for="adminPassword">Senha</label>
+                <input type="password" id="adminPassword" placeholder="Digite a senha" />
+            </div>
+            <button id="adminLoginButton" class="primary-btn">Entrar</button>
+            <div id="loginError" class="error-msg" hidden>Senha incorreta. Tente novamente.</div>
+        </div>
+        <!-- Admin Panel -->
+        <div id="adminPanel" hidden>
+            <section class="card">
+                <h2>Gerenciamento de Expansões (DLC)</h2>
+                <p>Adicione ou remova expansões de conteúdo (instrumentos, serviços) que o aplicativo carregará de forma dinâmica.</p>
+                <div id="expansionList" class="expansion-list"></div>
+                <button id="addExpansionBtn" class="secondary-btn">Adicionar nova expansão</button>
+                <!-- Modal for adding/editing expansions -->
+                <div id="expansionModal" class="modal" hidden>
+                    <div class="modal-content card">
+                        <h3 id="expansionModalTitle">Nova Expansão</h3>
+                        <label for="expansionName">Nome da expansão</label>
+                        <input type="text" id="expansionName" placeholder="Ex.: Percussões Exóticas" />
+                        <label for="expansionJson">Conteúdo (JSON)</label>
+                        <textarea id="expansionJson" rows="10" placeholder='{"instrumentos": {"djembê": {"label": "Djembê", "price": 250}}}'></textarea>
+                        <div class="modal-actions">
+                            <button id="saveExpansionBtn" class="primary-btn">Salvar</button>
+                            <button id="cancelExpansionBtn" class="secondary-btn">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section class="card">
+                <h2>Tabela de Preços</h2>
+                <p>Exportar ou importar a tabela de preços em formato JSON.</p>
+                <button id="exportPricingBtn" class="secondary-btn">Exportar tabela</button>
+                <label class="upload-label">
+                    <span class="upload-button">Importar nova tabela</span>
+                    <input type="file" id="pricingFileInput" accept="application/json" hidden />
+                </label>
+            </section>
+            <button id="logoutBtn" class="secondary-btn">Sair</button>
+        </div>
+    </main>
+    <footer class="app-footer">
+        <p>© <span id="currentYearAdmin"></span> Vale Produções &ndash; Todos os direitos reservados.</p>
+        <a href="index.html" class="admin-link">Voltar ao Início</a>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{
+  "expansions": [
+    {
+      "id": "percussao_exotica",
+      "name": "Percussões Exóticas",
+      "file": "percussao_exotica.json",
+      "version": "1.0.0"
+    }
+  ]
+}

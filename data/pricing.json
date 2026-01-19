@@ -1,0 +1,22 @@
+{
+  "instrumentos": {
+    "violao": { "label": "Violão", "price": 300 },
+    "guitarra": { "label": "Guitarra", "price": 400 },
+    "baixo": { "label": "Baixo", "price": 350 },
+    "bateria": { "label": "Bateria", "price": 500 },
+    "teclado": { "label": "Teclado / Piano", "price": 450 },
+    "percussao": { "label": "Percussão", "price": 300 },
+    "sopro": { "label": "Sopro (Sax, Trompete)", "price": 450 },
+    "cordas": { "label": "Cordas (Violino, Cello)", "price": 500 }
+  },
+  "voz": 200,
+  "servicos": {
+    "gravacao": { "label": "Captação/Gravação", "price": 500 },
+    "pos_producao": { "label": "Mixagem e Masterização", "price": 800 },
+    "gerenciamento_carreira": { "label": "Gerenciamento de Carreira", "price": 1200 },
+    "composicao": { "label": "Composição/Arranjo", "price": 800 },
+    "design_capa": { "label": "Design de Capa", "price": 300 },
+    "marketing": { "label": "Marketing e Distribuição Digital", "price": 600 },
+    "video_clip": { "label": "Produção de Videoclipe", "price": 1500 }
+  }
+}
