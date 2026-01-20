@@ -19,4 +19,18 @@
     "marketing": { "label": "Marketing e Distribuição Digital", "price": 600 },
     "video_clip": { "label": "Produção de Videoclipe", "price": 1500 }
   }
+  ,
+  "producao": {
+    "single": { "label": "Produção single (voz + base instrumental)", "price": 500 },
+    "ia": { "label": "Produção com IA", "price": 380 }
+  },
+  "edicao": {
+    "instrumento": { "label": "Edição de instrumento", "price": 200 },
+    "voz": { "label": "Edição de voz", "price": 200 }
+  },
+  "carreira": {
+    "3m": { "label": "Gerenciamento de carreira 3 meses", "price": 840 },
+    "6m": { "label": "Gerenciamento de carreira 6 meses", "price": 1680 },
+    "12m": { "label": "Gerenciamento de carreira 12 meses", "price": 3360 }
+  }
 }

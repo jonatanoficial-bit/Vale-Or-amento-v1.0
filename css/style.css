@@ -76,6 +76,13 @@ main {
     margin-bottom: 0.25rem;
 }
 
+small.hint {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.25rem;
+    display: block;
+}
+
 input,
 select,
 textarea {

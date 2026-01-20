@@ -29,6 +29,21 @@ export function generatePitch(data, breakdown, total) {
       typeMsg = 'Independentemente do formato, personalizamos cada produção para refletir sua identidade artística de forma autêntica.';
   }
 
+  // Texto sobre serviço de produção (single ou IA)
+  let prodMsg = '';
+  if (data.productionService === 'single') {
+    prodMsg = 'Optando por uma produção tradicional com voz e base instrumental, oferecemos toda a estrutura necessária para extrair a melhor performance e qualidade de som.';
+  } else if (data.productionService === 'ia') {
+    prodMsg = 'Com a produção impulsionada por inteligência artificial, combinamos tecnologia de ponta e expertise musical para criar arranjos inovadores e eficientes.';
+  }
+
+  // Texto sobre plano de carreira
+  let careerMsg = '';
+  if (data.careerPlan && data.careerPlan !== 'none') {
+    const meses = data.careerPlan.replace('m','');
+    careerMsg = `Incluído um plano de gerenciamento de carreira de ${meses} mês(es), cobrindo criação e manutenção de site, gerenciamento de redes sociais e análise de plataformas digitais para que sua presença online seja impactante e profissional.`;
+  }
+
   // Texto sobre instrumentos
   const instrumentMessages = [];
   Object.keys(instruments).forEach((key) => {
@@ -93,7 +108,7 @@ export function generatePitch(data, breakdown, total) {
   const investmentMsg = `O investimento estimado para este projeto é de ${formatCurrency(total)}. Esse valor reflete a dedicação de profissionais experientes e o uso de equipamentos de alto padrão.`;
 
   // Juntar tudo
-  const paragraphs = [intro, typeMsg, instrumentsMsg, vocalsMsg, servicesMsg, notesMsg, investmentMsg, closing];
+  const paragraphs = [intro, typeMsg, prodMsg, careerMsg, instrumentsMsg, vocalsMsg, servicesMsg, notesMsg, investmentMsg, closing];
   // Filtrar vazios
   const filtered = paragraphs.filter((p) => p && p.trim().length > 0);
   return filtered.join('\n\n');

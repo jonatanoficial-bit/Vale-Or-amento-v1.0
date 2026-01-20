@@ -51,6 +51,22 @@ export async function createPDF(data, breakdown, total, pitch) {
   currentY += 5;
   doc.text(`Número de vozes: ${data.vocals}`, 12, currentY);
   currentY += 5;
+  // Serviço de produção
+  if (data.productionService && data.productionService !== 'none') {
+    const prodLabel = pricingCache.producao?.[data.productionService]?.label || '';
+    if (prodLabel) {
+      doc.text(`Serviço de produção: ${prodLabel}`, 12, currentY);
+      currentY += 5;
+    }
+  }
+  // Plano de carreira
+  if (data.careerPlan && data.careerPlan !== 'none') {
+    const planLabel = pricingCache.carreira?.[data.careerPlan]?.label || '';
+    if (planLabel) {
+      doc.text(`Plano de carreira: ${planLabel}`, 12, currentY);
+      currentY += 5;
+    }
+  }
   // Instrumentos
   const instEntries = Object.entries(data.instruments);
   if (instEntries.length > 0) {
@@ -185,7 +201,10 @@ function productionTypeLabel(type) {
 // Keep a simple cache of pricing labels so pdf generator can print them
 const pricingCache = {
   instrumentos: {},
-  servicos: {}
+  servicos: {},
+  producao: {},
+  edicao: {},
+  carreira: {}
 };
 
 // Load pricing labels once
@@ -195,6 +214,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const baseConfig = await res.json();
     pricingCache.instrumentos = baseConfig.instrumentos;
     pricingCache.servicos = baseConfig.servicos;
+    pricingCache.producao = baseConfig.producao || {};
+    pricingCache.edicao = baseConfig.edicao || {};
+    pricingCache.carreira = baseConfig.carreira || {};
     // expansions from localStorage
     const stored = localStorage.getItem('valeExpansions');
     if (stored) {
@@ -202,6 +224,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       Object.values(expansions).forEach((exp) => {
         if (exp.instrumentos) Object.assign(pricingCache.instrumentos, exp.instrumentos);
         if (exp.servicos) Object.assign(pricingCache.servicos, exp.servicos);
+        if (exp.producao) Object.assign(pricingCache.producao, exp.producao);
+        if (exp.edicao) Object.assign(pricingCache.edicao, exp.edicao);
+        if (exp.carreira) Object.assign(pricingCache.carreira, exp.carreira);
       });
     }
   } catch (e) {

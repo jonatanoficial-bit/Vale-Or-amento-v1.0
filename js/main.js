@@ -78,6 +78,11 @@ async function loadConfiguration() {
       console.error('Erro ao carregar tabela de preços customizada', e);
     }
   }
+
+  // Ensure new categories exist (backwards compatibility)
+  if (!pricingConfig.producao) pricingConfig.producao = {};
+  if (!pricingConfig.edicao) pricingConfig.edicao = {};
+  if (!pricingConfig.carreira) pricingConfig.carreira = {};
 }
 
 // Build the instrument list UI
@@ -137,6 +142,8 @@ function gatherFormData() {
       phone: formData.get('clientPhone')?.trim() || ''
     },
     productionType: formData.get('productionType'),
+    productionService: formData.get('productionService') || 'none',
+    careerPlan: formData.get('careerPlan') || 'none',
     vocals: parseInt(formData.get('vocals')) || 0,
     instruments: {},
     services: [],
@@ -163,26 +170,61 @@ function gatherFormData() {
 function calculateCost(data) {
   let total = 0;
   const breakdown = [];
-  // vocals
-  if (data.vocals > 0) {
-    const cost = pricingConfig.voz * data.vocals;
-    total += cost;
-    breakdown.push({ label: `${data.vocals} voz(es)`, value: cost });
+  // Serviço de produção (single ou IA)
+  if (data.productionService && data.productionService !== 'none') {
+    const prod = pricingConfig.producao?.[data.productionService];
+    if (prod) {
+      total += prod.price;
+      breakdown.push({ key: `producao_${data.productionService}`, label: prod.label, value: prod.price });
+    }
   }
-  // instruments
+  // Instrumentos
   Object.entries(data.instruments).forEach(([key, qty]) => {
     const instrument = pricingConfig.instrumentos[key];
+    if (!instrument) return;
+    // Custo de instrumento próprio (por exemplo, contratação de músico)
     const cost = instrument.price * qty;
     total += cost;
-    breakdown.push({ label: `${qty}× ${instrument.label}`, value: cost });
+    breakdown.push({ key: `inst_${key}`, label: `${qty}× ${instrument.label}`, value: cost });
   });
-  // services
+  // Vocais (captura)
+  if (data.vocals > 0) {
+    const voiceCost = pricingConfig.voz * data.vocals;
+    total += voiceCost;
+    breakdown.push({ key: 'voz', label: `${data.vocals} voz(es) (captura)`, value: voiceCost });
+  }
+  // Edição de instrumentos e vozes (automática)
+  if (data.vocals > 0) {
+    const editVoiceCost = pricingConfig.edicao?.voz?.price * data.vocals || 0;
+    if (editVoiceCost > 0) {
+      total += editVoiceCost;
+      breakdown.push({ key: 'edicao_voz', label: `Edição de vozes (${data.vocals})`, value: editVoiceCost });
+    }
+  }
+  const totalInstruments = Object.values(data.instruments).reduce((acc, qty) => acc + qty, 0);
+  if (totalInstruments > 0) {
+    const editInstCost = pricingConfig.edicao?.instrumento?.price * totalInstruments || 0;
+    if (editInstCost > 0) {
+      total += editInstCost;
+      breakdown.push({ key: 'edicao_instrumento', label: `Edição de instrumentos (${totalInstruments})`, value: editInstCost });
+    }
+  }
+  // Serviços adicionais (convencionais)
   data.services.forEach((srvKey) => {
-    const service = pricingConfig.servicos[srvKey];
+    const service = pricingConfig.servicos?.[srvKey];
+    if (!service) return;
     const cost = service.price;
     total += cost;
-    breakdown.push({ label: service.label, value: cost });
+    breakdown.push({ key: `srv_${srvKey}`, label: service.label, value: cost });
   });
+  // Plano de carreira
+  if (data.careerPlan && data.careerPlan !== 'none') {
+    const plan = pricingConfig.carreira?.[data.careerPlan];
+    if (plan) {
+      total += plan.price;
+      breakdown.push({ key: `carreira_${data.careerPlan}`, label: plan.label, value: plan.price });
+    }
+  }
   return { total, breakdown };
 }
 
@@ -257,6 +299,141 @@ async function handleGenerateQuote() {
 // Set up event listeners
 document.addEventListener('DOMContentLoaded', () => {
   init();
-  const genButton = document.getElementById('generateQuote');
-  genButton?.addEventListener('click', () => handleGenerateQuote());
+  const nextButton = document.getElementById('nextButton');
+  const backButton = document.getElementById('backButton');
+  const confirmButton = document.getElementById('confirmButton');
+  const discountTypeSelect = document.getElementById('discountType');
+  const discountValueInput = document.getElementById('discountValue');
+
+  nextButton?.addEventListener('click', () => {
+    showReview();
+  });
+
+  backButton?.addEventListener('click', () => {
+    // Return to form
+    document.getElementById('reviewSection').hidden = true;
+    document.getElementById('quoteForm').hidden = false;
+    document.getElementById('feedback').hidden = true;
+  });
+
+  confirmButton?.addEventListener('click', async () => {
+    await handleConfirm();
+  });
+
+  discountTypeSelect?.addEventListener('change', () => {
+    const type = discountTypeSelect.value;
+    if (type === 'none') {
+      discountValueInput.disabled = true;
+      discountValueInput.value = 0;
+    } else {
+      discountValueInput.disabled = false;
+    }
+    computeFinalTotal();
+  });
+
+  discountValueInput?.addEventListener('input', () => {
+    computeFinalTotal();
+  });
 });
+
+// Current quote state
+let currentQuote = null;
+
+// Show the review section with summary and discount options
+function showReview() {
+  const data = gatherFormData();
+  const { total, breakdown } = calculateCost(data);
+  currentQuote = { data, breakdown, subtotal: total };
+  // Render breakdown in reviewContent
+  const reviewContent = document.getElementById('reviewContent');
+  reviewContent.innerHTML = '';
+  const list = document.createElement('ul');
+  list.className = 'review-list';
+  breakdown.forEach((item) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${item.label}:</strong> ${formatCurrency(item.value)}`;
+    list.appendChild(li);
+  });
+  // Subtotal display
+  document.getElementById('subtotalDisplay').textContent = `Subtotal: ${formatCurrency(total)}`;
+  reviewContent.appendChild(list);
+  // Reset discount inputs
+  const discountType = document.getElementById('discountType');
+  const discountValue = document.getElementById('discountValue');
+  discountType.value = 'none';
+  discountValue.value = 0;
+  discountValue.disabled = true;
+  // Compute final total
+  computeFinalTotal();
+  // Show review section, hide form
+  document.getElementById('quoteForm').hidden = true;
+  document.getElementById('reviewSection').hidden = false;
+  // Hide old feedback
+  document.getElementById('feedback').hidden = true;
+}
+
+// Compute discount and final total, update UI
+function computeFinalTotal() {
+  if (!currentQuote) return;
+  const discountType = document.getElementById('discountType').value;
+  const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
+  const subtotal = currentQuote.subtotal;
+  let discountAmount = 0;
+  if (discountType === 'value') {
+    discountAmount = Math.min(discountValue, subtotal);
+  } else if (discountType === 'percentage') {
+    const percentage = discountValue / 100;
+    discountAmount = subtotal * percentage;
+  }
+  const finalTotal = Math.max(0, subtotal - discountAmount);
+  // Update info texts
+  const discountInfoEl = document.getElementById('discountInfo');
+  const finalTotalEl = document.getElementById('finalTotal');
+  if (discountType === 'none' || discountAmount === 0) {
+    discountInfoEl.textContent = '';
+  } else {
+    discountInfoEl.textContent = `Desconto aplicado: -${formatCurrency(discountAmount)}`;
+  }
+  finalTotalEl.textContent = `Total final: ${formatCurrency(finalTotal)}`;
+  currentQuote.discount = { type: discountType, value: discountValue, amount: discountAmount };
+  currentQuote.finalTotal = finalTotal;
+}
+
+// Handle confirmation (generate PDF)
+async function handleConfirm() {
+  if (!currentQuote) return;
+  const button = document.getElementById('confirmButton');
+  button.disabled = true;
+  button.textContent = 'Gerando...';
+  try {
+    const { data, breakdown, discount, finalTotal, subtotal } = currentQuote;
+    // Build breakdown including discount if applied
+    const finalBreakdown = [...breakdown];
+    if (discount && discount.amount > 0) {
+      finalBreakdown.push({ key: 'discount', label: 'Desconto', value: -discount.amount });
+    }
+    // Total line will be drawn in PDF generator separately
+    // Generate pitch using subtotal (original total) or final total? Use final total for investment message
+    const pitch = generatePitch(data, finalBreakdown, finalTotal);
+    // Call PDF generator
+    await createPDF(data, finalBreakdown, finalTotal, pitch);
+    // Provide feedback
+    const feedback = document.getElementById('feedback');
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.textContent = 'Orçamento gerado com sucesso! O download deve iniciar automaticamente.';
+    }
+  } catch (err) {
+    console.error(err);
+    const feedback = document.getElementById('feedback');
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.style.color = '#ff7272';
+      feedback.textContent = 'Ocorreu um erro ao gerar o orçamento. Tente novamente.';
+    }
+  } finally {
+    const button2 = document.getElementById('confirmButton');
+    button2.disabled = false;
+    button2.textContent = 'Gerar PDF';
+  }
+}
