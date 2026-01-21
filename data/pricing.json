@@ -9,28 +9,29 @@
     "sopro": { "label": "Sopro (Sax, Trompete)", "price": 450 },
     "cordas": { "label": "Cordas (Violino, Cello)", "price": 500 }
   },
-  "voz": 200,
+  "voz": 280,
   "servicos": {
-    "gravacao": { "label": "Captação/Gravação", "price": 500 },
-    "pos_producao": { "label": "Mixagem e Masterização", "price": 800 },
-    "gerenciamento_carreira": { "label": "Gerenciamento de Carreira", "price": 1200 },
-    "composicao": { "label": "Composição/Arranjo", "price": 800 },
-    "design_capa": { "label": "Design de Capa", "price": 300 },
-    "marketing": { "label": "Marketing e Distribuição Digital", "price": 600 },
-    "video_clip": { "label": "Produção de Videoclipe", "price": 1500 }
+    "mixagem": { "label": "Mixagem Profissional", "price": 480 },
+    "masterizacao": { "label": "Masterização", "price": 300 },
+    "pos_producao_pacote": { "label": "Mixagem + Masterização (pacote)", "price": 700 },
+    "composicao": { "label": "Composição/Arranjo", "price": 650 },
+    "design_capa": { "label": "Design de Capa", "price": 250 },
+    "distribuicao": { "label": "Distribuição digital (lançamento)", "price": 150 },
+    "marketing": { "label": "Marketing básico (1 campanha)", "price": 350 },
+    "video_clip": { "label": "Produção de Videoclipe (base)", "price": 1500 }
   }
   ,
   "producao": {
-    "single": { "label": "Produção single (voz + base instrumental)", "price": 500 },
-    "ia": { "label": "Produção com IA", "price": 380 }
+    "single": { "label": "Single (Voz + Base Vale Produções)", "price": 650 },
+    "ia": { "label": "Produção com IA (Instrumental)", "price": 450 }
   },
   "edicao": {
     "instrumento": { "label": "Edição de instrumento", "price": 200 },
-    "voz": { "label": "Edição de voz", "price": 200 }
+    "voz": { "label": "Edição de voz (por voz)", "price": 220 }
   },
   "carreira": {
-    "3m": { "label": "Gerenciamento de carreira 3 meses", "price": 840 },
-    "6m": { "label": "Gerenciamento de carreira 6 meses", "price": 1680 },
-    "12m": { "label": "Gerenciamento de carreira 12 meses", "price": 3360 }
+    "3m": { "label": "Gestão de carreira (3 meses)", "price": 1440 },
+    "6m": { "label": "Gestão de carreira (6 meses)", "price": 2880 },
+    "12m": { "label": "Gestão de carreira (12 meses)", "price": 5760 }
   }
 }

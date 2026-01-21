@@ -170,6 +170,8 @@ function gatherFormData() {
 function calculateCost(data) {
   let total = 0;
   const breakdown = [];
+  const isSingle = data.productionService === 'single';
+  const isIA = data.productionService === 'ia';
   // Serviço de produção (single ou IA)
   if (data.productionService && data.productionService !== 'none') {
     const prod = pricingConfig.producao?.[data.productionService];
@@ -188,25 +190,33 @@ function calculateCost(data) {
     breakdown.push({ key: `inst_${key}`, label: `${qty}× ${instrument.label}`, value: cost });
   });
   // Vocais (captura)
-  if (data.vocals > 0) {
-    const voiceCost = pricingConfig.voz * data.vocals;
+  // Regra:
+  // - Single inclui 1 voz (captura). Voze(s) adicionais são cobradas à parte.
+  // - IA não inclui voz, então todas as vozes são cobradas.
+  const includedVoices = isSingle ? 1 : 0;
+  const billableVoices = Math.max(0, (parseInt(data.vocals, 10) || 0) - includedVoices);
+  if (billableVoices > 0) {
+    const voiceCost = pricingConfig.voz * billableVoices;
     total += voiceCost;
-    breakdown.push({ key: 'voz', label: `${data.vocals} voz(es) (captura)`, value: voiceCost });
+    breakdown.push({ key: 'voz', label: `${billableVoices} voz(es) (captação)`, value: voiceCost });
   }
-  // Edição de instrumentos e vozes (automática)
-  if (data.vocals > 0) {
-    const editVoiceCost = pricingConfig.edicao?.voz?.price * data.vocals || 0;
-    if (editVoiceCost > 0) {
-      total += editVoiceCost;
-      breakdown.push({ key: 'edicao_voz', label: `Edição de vozes (${data.vocals})`, value: editVoiceCost });
+
+  // Edição automática (somente quando a produção é IA)
+  if (isIA) {
+    if (data.vocals > 0) {
+      const editVoiceCost = (pricingConfig.edicao?.voz?.price || 0) * data.vocals;
+      if (editVoiceCost > 0) {
+        total += editVoiceCost;
+        breakdown.push({ key: 'edicao_voz', label: `Edição de vozes (${data.vocals})`, value: editVoiceCost });
+      }
     }
-  }
-  const totalInstruments = Object.values(data.instruments).reduce((acc, qty) => acc + qty, 0);
-  if (totalInstruments > 0) {
-    const editInstCost = pricingConfig.edicao?.instrumento?.price * totalInstruments || 0;
-    if (editInstCost > 0) {
-      total += editInstCost;
-      breakdown.push({ key: 'edicao_instrumento', label: `Edição de instrumentos (${totalInstruments})`, value: editInstCost });
+    const totalInstruments = Object.values(data.instruments).reduce((acc, qty) => acc + qty, 0);
+    if (totalInstruments > 0) {
+      const editInstCost = (pricingConfig.edicao?.instrumento?.price || 0) * totalInstruments;
+      if (editInstCost > 0) {
+        total += editInstCost;
+        breakdown.push({ key: 'edicao_instrumento', label: `Edição de instrumentos (${totalInstruments})`, value: editInstCost });
+      }
     }
   }
   // Serviços adicionais (convencionais)
