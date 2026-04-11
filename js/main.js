@@ -1,449 +1,592 @@
-// Main JavaScript for the quote generator
-// This script handles loading configuration, building form components,
-// collecting user data, calculating costs, generating persuasive text
-// and creating a PDF with the jsPDF library. It is written as a module.
+import { loadPricing, pushQuoteHistory } from "./dataStore.js";
+import { buildPitch } from "./pitchAI.js";
+import { generateQuotePdf } from "./pdfGenerator.js";
 
-import { generatePitch } from './pitchAI.js';
-import { createPDF } from './pdfGenerator.js';
+const state = {
+  pricing: null,
+  latestCalculation: null,
+  latestQuote: null
+};
 
-// Global variables to hold pricing configuration and expansions
-let pricingConfig = null;
-let expansionData = {};
+const dom = {};
 
-// Utility to fetch JSON files relative to the application root
-async function fetchJSON(path) {
-  const response = await fetch(path);
-  if (!response.ok) throw new Error(`Não foi possível carregar ${path}: ${response.statusText}`);
-  return await response.json();
-}
+document.addEventListener("DOMContentLoaded", async () => {
+  cacheDom();
+  dom.currentYear.textContent = new Date().getFullYear();
+  bindEvents();
 
-// Merge two pricing objects together (for expansions)
-function mergePricing(base, addition) {
-  const result = JSON.parse(JSON.stringify(base));
-  if (addition.instrumentos) {
-    result.instrumentos = { ...result.instrumentos, ...addition.instrumentos };
-  }
-  if (addition.servicos) {
-    result.servicos = { ...result.servicos, ...addition.servicos };
-  }
-  if (addition.voz) {
-    result.voz = addition.voz;
-  }
-  return result;
-}
-
-// Load base pricing and expansions
-async function loadConfiguration() {
-  // load base pricing
-  pricingConfig = await fetchJSON('data/pricing.json');
-
-  // load expansions from manifest
   try {
-    const manifest = await fetchJSON('dlc/manifest.json');
-    if (manifest && Array.isArray(manifest.expansions)) {
-      for (const exp of manifest.expansions) {
-        try {
-          const data = await fetchJSON(`dlc/${exp.file}`);
-          expansionData[exp.id] = data;
-          pricingConfig = mergePricing(pricingConfig, data);
-        } catch (e) {
-          console.warn('Falha ao carregar expansão', exp, e);
-        }
-      }
-    }
-  } catch (e) {
-    // Manifest may not exist; ignore
+    state.pricing = await loadPricing();
+    applyMetaToUi(state.pricing);
+    renderPackages();
+    renderInstruments();
+    renderServices();
+    updateSummary();
+  } catch (error) {
+    console.error(error);
+    alert("Falha ao carregar a tabela de preços. Verifique os arquivos do projeto.");
   }
-
-  // load expansions from localStorage
-  const stored = localStorage.getItem('valeExpansions');
-  if (stored) {
-    try {
-      const storedExpansions = JSON.parse(stored);
-      for (const key in storedExpansions) {
-        pricingConfig = mergePricing(pricingConfig, storedExpansions[key]);
-      }
-    } catch (err) {
-      console.error('Erro ao analisar expansões do localStorage', err);
-    }
-  }
-
-  // Apply pricing override if present
-  const overrideStr = localStorage.getItem('valePricingOverride');
-  if (overrideStr) {
-    try {
-      const overridePricing = JSON.parse(overrideStr);
-      pricingConfig = overridePricing;
-    } catch (e) {
-      console.error('Erro ao carregar tabela de preços customizada', e);
-    }
-  }
-
-  // Ensure new categories exist (backwards compatibility)
-  if (!pricingConfig.producao) pricingConfig.producao = {};
-  if (!pricingConfig.edicao) pricingConfig.edicao = {};
-  if (!pricingConfig.carreira) pricingConfig.carreira = {};
-}
-
-// Build the instrument list UI
-function buildInstrumentList() {
-  const container = document.getElementById('instrumentList');
-  container.innerHTML = '';
-  const instruments = pricingConfig.instrumentos;
-  Object.keys(instruments).forEach((key) => {
-    const instrument = instruments[key];
-    const wrapper = document.createElement('div');
-    wrapper.className = 'instrument-item';
-    const label = document.createElement('label');
-    label.textContent = instrument.label;
-    label.setAttribute('for', `inst-${key}`);
-    const qtyInput = document.createElement('input');
-    qtyInput.type = 'number';
-    qtyInput.min = '0';
-    qtyInput.value = '0';
-    qtyInput.id = `inst-${key}`;
-    qtyInput.name = `inst-${key}`;
-    wrapper.appendChild(label);
-    wrapper.appendChild(qtyInput);
-    container.appendChild(wrapper);
-  });
-}
-
-// Build the services list UI
-function buildServiceList() {
-  const container = document.getElementById('serviceList');
-  container.innerHTML = '';
-  const services = pricingConfig.servicos;
-  Object.keys(services).forEach((key) => {
-    const service = services[key];
-    const wrapper = document.createElement('div');
-    wrapper.className = 'service-item';
-    const label = document.createElement('label');
-    label.textContent = service.label;
-    label.setAttribute('for', `srv-${key}`);
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `srv-${key}`;
-    checkbox.name = `srv-${key}`;
-    wrapper.appendChild(label);
-    wrapper.appendChild(checkbox);
-    container.appendChild(wrapper);
-  });
-}
-
-// Gather data from the form
-function gatherFormData() {
-  const form = document.getElementById('quoteForm');
-  const formData = new FormData(form);
-  const data = {
-    client: {
-      name: formData.get('clientName').trim(),
-      email: formData.get('clientEmail').trim(),
-      phone: formData.get('clientPhone')?.trim() || ''
-    },
-    productionType: formData.get('productionType'),
-    productionService: formData.get('productionService') || 'none',
-    careerPlan: formData.get('careerPlan') || 'none',
-    vocals: parseInt(formData.get('vocals')) || 0,
-    instruments: {},
-    services: [],
-    notes: formData.get('notes')?.trim() || ''
-  };
-  // gather instruments and quantities
-  Object.keys(pricingConfig.instrumentos).forEach((key) => {
-    const qty = parseInt(formData.get(`inst-${key}`)) || 0;
-    if (qty > 0) {
-      data.instruments[key] = qty;
-    }
-  });
-  // gather services
-  Object.keys(pricingConfig.servicos).forEach((key) => {
-    const checked = formData.get(`srv-${key}`);
-    if (checked) {
-      data.services.push(key);
-    }
-  });
-  return data;
-}
-
-// Calculate cost and build cost breakdown
-function calculateCost(data) {
-  let total = 0;
-  const breakdown = [];
-  const isSingle = data.productionService === 'single';
-  const isIA = data.productionService === 'ia';
-  // Serviço de produção (single ou IA)
-  if (data.productionService && data.productionService !== 'none') {
-    const prod = pricingConfig.producao?.[data.productionService];
-    if (prod) {
-      total += prod.price;
-      breakdown.push({ key: `producao_${data.productionService}`, label: prod.label, value: prod.price });
-    }
-  }
-  // Instrumentos
-  Object.entries(data.instruments).forEach(([key, qty]) => {
-    const instrument = pricingConfig.instrumentos[key];
-    if (!instrument) return;
-    // Custo de instrumento próprio (por exemplo, contratação de músico)
-    const cost = instrument.price * qty;
-    total += cost;
-    breakdown.push({ key: `inst_${key}`, label: `${qty}× ${instrument.label}`, value: cost });
-  });
-  // Vocais (captura)
-  // Regra:
-  // - Single inclui 1 voz (captura). Voze(s) adicionais são cobradas à parte.
-  // - IA não inclui voz, então todas as vozes são cobradas.
-  const includedVoices = isSingle ? 1 : 0;
-  const billableVoices = Math.max(0, (parseInt(data.vocals, 10) || 0) - includedVoices);
-  if (billableVoices > 0) {
-    const voiceCost = pricingConfig.voz * billableVoices;
-    total += voiceCost;
-    breakdown.push({ key: 'voz', label: `${billableVoices} voz(es) (captação)`, value: voiceCost });
-  }
-
-  // Edição automática (somente quando a produção é IA)
-  if (isIA) {
-    if (data.vocals > 0) {
-      const editVoiceCost = (pricingConfig.edicao?.voz?.price || 0) * data.vocals;
-      if (editVoiceCost > 0) {
-        total += editVoiceCost;
-        breakdown.push({ key: 'edicao_voz', label: `Edição de vozes (${data.vocals})`, value: editVoiceCost });
-      }
-    }
-    const totalInstruments = Object.values(data.instruments).reduce((acc, qty) => acc + qty, 0);
-    if (totalInstruments > 0) {
-      const editInstCost = (pricingConfig.edicao?.instrumento?.price || 0) * totalInstruments;
-      if (editInstCost > 0) {
-        total += editInstCost;
-        breakdown.push({ key: 'edicao_instrumento', label: `Edição de instrumentos (${totalInstruments})`, value: editInstCost });
-      }
-    }
-  }
-  // Serviços adicionais (convencionais)
-  data.services.forEach((srvKey) => {
-    const service = pricingConfig.servicos?.[srvKey];
-    if (!service) return;
-    const cost = service.price;
-    total += cost;
-    breakdown.push({ key: `srv_${srvKey}`, label: service.label, value: cost });
-  });
-  // Plano de carreira
-  if (data.careerPlan && data.careerPlan !== 'none') {
-    const plan = pricingConfig.carreira?.[data.careerPlan];
-    if (plan) {
-      total += plan.price;
-      breakdown.push({ key: `carreira_${data.careerPlan}`, label: plan.label, value: plan.price });
-    }
-  }
-  return { total, breakdown };
-}
-
-// Format currency in Brazilian Real
-function formatCurrency(value) {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
-
-// Update footer year
-function updateCurrentYear() {
-  const year = new Date().getFullYear();
-  const yearSpan = document.getElementById('currentYear');
-  const yearAdminSpan = document.getElementById('currentYearAdmin');
-  if (yearSpan) yearSpan.textContent = year;
-  if (yearAdminSpan) yearAdminSpan.textContent = year;
-}
-
-// Main initialization
-async function init() {
-  try {
-    await loadConfiguration();
-    buildInstrumentList();
-    buildServiceList();
-    updateCurrentYear();
-  } catch (err) {
-    console.error(err);
-    const feedback = document.getElementById('feedback');
-    if (feedback) {
-      feedback.hidden = false;
-      feedback.textContent = 'Erro ao carregar configurações. Atualize a página ou verifique os arquivos.';
-    }
-  }
-}
-
-// Handle quote generation
-async function handleGenerateQuote() {
-  const button = document.getElementById('generateQuote');
-  button.disabled = true;
-  button.textContent = 'Gerando...';
-  try {
-    const data = gatherFormData();
-    const { total, breakdown } = calculateCost(data);
-    // Show total cost on the page
-    const totalCostEl = document.getElementById('totalCost');
-    if (totalCostEl) {
-      totalCostEl.textContent = `Total estimado: ${formatCurrency(total)}`;
-    }
-    // Generate persuasive text
-    const pitch = generatePitch(data, breakdown, total);
-    // Generate PDF
-    await createPDF(data, breakdown, total, pitch);
-    // Provide feedback
-    const feedback = document.getElementById('feedback');
-    if (feedback) {
-      feedback.hidden = false;
-      feedback.textContent = 'Orçamento gerado com sucesso! O download deve iniciar automaticamente.';
-    }
-  } catch (err) {
-    console.error(err);
-    const feedback = document.getElementById('feedback');
-    if (feedback) {
-      feedback.hidden = false;
-      feedback.style.color = '#ff7272';
-      feedback.textContent = 'Ocorreu um erro ao gerar o orçamento. Tente novamente.';
-    }
-  } finally {
-    button.disabled = false;
-    button.textContent = 'Gerar Orçamento em PDF';
-  }
-}
-
-// Set up event listeners
-document.addEventListener('DOMContentLoaded', () => {
-  init();
-  const nextButton = document.getElementById('nextButton');
-  const backButton = document.getElementById('backButton');
-  const confirmButton = document.getElementById('confirmButton');
-  const discountTypeSelect = document.getElementById('discountType');
-  const discountValueInput = document.getElementById('discountValue');
-
-  nextButton?.addEventListener('click', () => {
-    showReview();
-  });
-
-  backButton?.addEventListener('click', () => {
-    // Return to form
-    document.getElementById('reviewSection').hidden = true;
-    document.getElementById('quoteForm').hidden = false;
-    document.getElementById('feedback').hidden = true;
-  });
-
-  confirmButton?.addEventListener('click', async () => {
-    await handleConfirm();
-  });
-
-  discountTypeSelect?.addEventListener('change', () => {
-    const type = discountTypeSelect.value;
-    if (type === 'none') {
-      discountValueInput.disabled = true;
-      discountValueInput.value = 0;
-    } else {
-      discountValueInput.disabled = false;
-    }
-    computeFinalTotal();
-  });
-
-  discountValueInput?.addEventListener('input', () => {
-    computeFinalTotal();
-  });
 });
 
-// Current quote state
-let currentQuote = null;
+function cacheDom() {
+  dom.form = document.getElementById("quoteForm");
+  dom.packageSelect = document.getElementById("packageSelect");
+  dom.songCount = document.getElementById("songCount");
+  dom.productionType = document.getElementById("productionType");
+  dom.priorityLevel = document.getElementById("priorityLevel");
+  dom.releaseGoal = document.getElementById("releaseGoal");
+  dom.vocals = document.getElementById("vocals");
+  dom.partnerStudioHours = document.getElementById("partnerStudioHours");
+  dom.revisionRounds = document.getElementById("revisionRounds");
+  dom.instrumentList = document.getElementById("instrumentList");
+  dom.serviceGroups = document.getElementById("serviceGroups");
+  dom.summaryState = document.getElementById("summaryState");
+  dom.summaryGrid = document.getElementById("summaryGrid");
+  dom.healthyFloorDisplay = document.getElementById("healthyFloorDisplay");
+  dom.idealPriceDisplay = document.getElementById("idealPriceDisplay");
+  dom.premiumPriceDisplay = document.getElementById("premiumPriceDisplay");
+  dom.summaryDetail = document.getElementById("summaryDetail");
+  dom.actionIdealValue = document.getElementById("actionIdealValue");
+  dom.reviewButton = document.getElementById("reviewButton");
+  dom.reviewSection = document.getElementById("reviewSection");
+  dom.reviewContent = document.getElementById("reviewContent");
+  dom.reviewSubtotal = document.getElementById("reviewSubtotal");
+  dom.reviewDiscount = document.getElementById("reviewDiscount");
+  dom.reviewTotal = document.getElementById("reviewTotal");
+  dom.depositDisplay = document.getElementById("depositDisplay");
+  dom.paymentBreakdown = document.getElementById("paymentBreakdown");
+  dom.discountType = document.getElementById("discountType");
+  dom.discountValue = document.getElementById("discountValue");
+  dom.quoteProfile = document.getElementById("quoteProfile");
+  dom.paymentTemplate = document.getElementById("paymentTemplate");
+  dom.backButton = document.getElementById("backButton");
+  dom.generatePdfButton = document.getElementById("generatePdfButton");
+  dom.warningBox = document.getElementById("warningBox");
+  dom.currentYear = document.getElementById("currentYear");
+  dom.footerBuildInfo = document.getElementById("footerBuildInfo");
+  dom.depositBadge = document.querySelector("[data-deposit-badge]");
+  dom.validityBadge = document.querySelector("[data-validity-badge]");
+  dom.versionNodes = document.querySelectorAll("[data-version]");
+  dom.buildNodes = document.querySelectorAll("[data-build]");
+}
 
-// Show the review section with summary and discount options
-function showReview() {
-  const data = gatherFormData();
-  const { total, breakdown } = calculateCost(data);
-  currentQuote = { data, breakdown, subtotal: total };
-  // Render breakdown in reviewContent
-  const reviewContent = document.getElementById('reviewContent');
-  reviewContent.innerHTML = '';
-  const list = document.createElement('ul');
-  list.className = 'review-list';
-  breakdown.forEach((item) => {
-    const li = document.createElement('li');
-    li.innerHTML = `<strong>${item.label}:</strong> ${formatCurrency(item.value)}`;
-    list.appendChild(li);
+function bindEvents() {
+  document.addEventListener("input", (event) => {
+    if (event.target.closest("#quoteForm") || event.target.closest("#reviewSection")) {
+      updateSummary();
+      if (!dom.reviewSection.hidden) renderReview();
+    }
   });
-  // Subtotal display
-  document.getElementById('subtotalDisplay').textContent = `Subtotal: ${formatCurrency(total)}`;
-  reviewContent.appendChild(list);
-  // Reset discount inputs
-  const discountType = document.getElementById('discountType');
-  const discountValue = document.getElementById('discountValue');
-  discountType.value = 'none';
-  discountValue.value = 0;
-  discountValue.disabled = true;
-  // Compute final total
-  computeFinalTotal();
-  // Show review section, hide form
-  document.getElementById('quoteForm').hidden = true;
-  document.getElementById('reviewSection').hidden = false;
-  // Hide old feedback
-  document.getElementById('feedback').hidden = true;
+
+  document.addEventListener("change", (event) => {
+    if (event.target.closest("#quoteForm") || event.target.closest("#reviewSection")) {
+      if (event.target === dom.discountType) {
+        dom.discountValue.disabled = event.target.value === "none";
+        if (event.target.value === "none") dom.discountValue.value = 0;
+      }
+      updateSummary();
+      if (!dom.reviewSection.hidden) renderReview();
+    }
+  });
+
+  dom.reviewButton.addEventListener("click", () => {
+    if (!dom.form.reportValidity()) return;
+    renderReview();
+    dom.reviewSection.hidden = false;
+    dom.reviewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  dom.backButton.addEventListener("click", () => {
+    dom.reviewSection.hidden = true;
+    dom.reviewButton.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
+
+  dom.generatePdfButton.addEventListener("click", () => {
+    if (!state.latestQuote) return;
+    const quote = buildQuotePayload();
+    state.latestQuote = quote;
+    pushQuoteHistory({
+      number: quote.number,
+      generatedAt: quote.meta.generatedAt,
+      client: quote.client.name,
+      artist: quote.client.artistName || "",
+      packageLabel: quote.packageInfo.label,
+      profileLabel: quote.calculations.profileLabel,
+      finalValue: quote.calculations.finalTotalFormatted,
+      profileValue: quote.calculations.profileValueFormatted,
+      discount: quote.calculations.discountFormatted
+    });
+    generateQuotePdf(quote);
+  });
 }
 
-// Compute discount and final total, update UI
-function computeFinalTotal() {
-  if (!currentQuote) return;
-  const discountType = document.getElementById('discountType').value;
-  const discountValue = parseFloat(document.getElementById('discountValue').value) || 0;
-  const subtotal = currentQuote.subtotal;
-  let discountAmount = 0;
-  if (discountType === 'value') {
-    discountAmount = Math.min(discountValue, subtotal);
-  } else if (discountType === 'percentage') {
-    const percentage = discountValue / 100;
-    discountAmount = subtotal * percentage;
+function applyMetaToUi(pricing) {
+  dom.versionNodes.forEach((node) => {
+    node.textContent = pricing.meta.version;
+  });
+  dom.buildNodes.forEach((node) => {
+    node.textContent = pricing.meta.build;
+  });
+  dom.footerBuildInfo.textContent = `Versão ${pricing.meta.version} • Build ${pricing.meta.build} • ${pricing.meta.builtAt}`;
+  dom.depositBadge.textContent = `${pricing.settings.depositPercent}%`;
+  dom.validityBadge.textContent = `${pricing.settings.validityDays} dias`;
+}
+
+function renderPackages() {
+  const options = Object.entries(state.pricing.packages)
+    .map(([id, pack]) => `<option value="${id}">${pack.label} - ${formatCurrency(pack.basePrice)}</option>`)
+    .join("");
+  dom.packageSelect.innerHTML = options;
+}
+
+function renderInstruments() {
+  dom.instrumentList.innerHTML = Object.entries(state.pricing.instruments)
+    .map(([id, item]) => `
+      <div class="selection-item">
+        <input type="checkbox" class="toggle instrument-toggle" data-instrument-id="${id}" id="instrument-${id}" />
+        <div class="item-meta">
+          <label class="item-title" for="instrument-${id}">${item.label}</label>
+          <div class="item-price">${formatCurrency(item.price)} • ${item.description || "Elemento adicional de produção"}</div>
+        </div>
+        <div class="inline-input">
+          <label for="instrument-qty-${id}">Qtd.</label>
+          <input type="number" id="instrument-qty-${id}" data-instrument-qty="${id}" min="1" value="1" disabled />
+        </div>
+      </div>`)
+    .join("");
+
+  dom.instrumentList.querySelectorAll(".instrument-toggle").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const qty = dom.instrumentList.querySelector(`[data-instrument-qty="${checkbox.dataset.instrumentId}"]`);
+      qty.disabled = !checkbox.checked;
+      if (!checkbox.checked) qty.value = 1;
+      updateSummary();
+    });
+  });
+}
+
+function renderServices() {
+  const grouped = {};
+  Object.entries(state.pricing.services).forEach(([id, service]) => {
+    const category = service.category || "Outros";
+    grouped[category] = grouped[category] || [];
+    grouped[category].push({ id, ...service });
+  });
+
+  dom.serviceGroups.innerHTML = Object.entries(grouped)
+    .map(([category, items]) => `
+      <div class="service-group">
+        <h3>${category}</h3>
+        <div class="service-group-grid">
+          ${items
+            .map(
+              (service) => `
+              <div class="service-item">
+                <input type="checkbox" class="toggle service-toggle" data-service-id="${service.id}" id="service-${service.id}" />
+                <div class="item-meta">
+                  <label class="item-title" for="service-${service.id}">${service.label}</label>
+                  <div class="item-price">${formatCurrency(service.price)} / ${service.unit || "item"}</div>
+                </div>
+                <div class="inline-input">
+                  <label for="service-qty-${service.id}">Qtd.</label>
+                  <input type="number" id="service-qty-${service.id}" data-service-qty="${service.id}" min="1" value="1" disabled />
+                </div>
+              </div>`
+            )
+            .join("")}
+        </div>
+      </div>`)
+    .join("");
+
+  dom.serviceGroups.querySelectorAll(".service-toggle").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      const qty = dom.serviceGroups.querySelector(`[data-service-qty="${checkbox.dataset.serviceId}"]`);
+      qty.disabled = !checkbox.checked;
+      if (!checkbox.checked) qty.value = 1;
+      updateSummary();
+    });
+  });
+}
+
+function collectSelections() {
+  const packageId = dom.packageSelect.value;
+  const packageInfo = state.pricing.packages[packageId];
+  const songCount = clampNumber(dom.songCount.value, 1);
+  const productionType = dom.productionType.value;
+  const priorityLevel = dom.priorityLevel.value;
+  const releaseGoal = dom.releaseGoal.value;
+  const vocals = clampNumber(dom.vocals.value, 0);
+  const partnerStudioHours = clampNumber(dom.partnerStudioHours.value, 0);
+  const revisionRounds = clampNumber(dom.revisionRounds.value, 0);
+
+  const selectedInstruments = [];
+  dom.instrumentList.querySelectorAll(".instrument-toggle:checked").forEach((checkbox) => {
+    const id = checkbox.dataset.instrumentId;
+    const qtyInput = dom.instrumentList.querySelector(`[data-instrument-qty="${id}"]`);
+    const qty = clampNumber(qtyInput?.value, 1);
+    selectedInstruments.push({ id, qty, ...state.pricing.instruments[id] });
+  });
+
+  const selectedServices = [];
+  dom.serviceGroups.querySelectorAll(".service-toggle:checked").forEach((checkbox) => {
+    const id = checkbox.dataset.serviceId;
+    const qtyInput = dom.serviceGroups.querySelector(`[data-service-qty="${id}"]`);
+    const qty = clampNumber(qtyInput?.value, 1);
+    selectedServices.push({ id, qty, ...state.pricing.services[id] });
+  });
+
+  return {
+    packageId,
+    packageInfo,
+    songCount,
+    productionType,
+    priorityLevel,
+    releaseGoal,
+    vocals,
+    partnerStudioHours,
+    revisionRounds,
+    selectedInstruments,
+    selectedServices
+  };
+}
+
+function calculateQuote() {
+  if (!state.pricing) return null;
+
+  const selection = collectSelections();
+  const settings = state.pricing.settings;
+  const breakdown = [];
+
+  let idealSubtotal = 0;
+
+  let packageValue = selection.packageInfo.basePrice;
+  if (selection.packageInfo.pricingMode === "per_song") {
+    packageValue = selection.packageInfo.basePrice * selection.songCount;
+  } else if (selection.packageInfo.pricingMode === "project") {
+    const includedSongs = selection.packageInfo.includedSongs || 1;
+    const extraSongs = Math.max(0, selection.songCount - includedSongs);
+    packageValue = selection.packageInfo.basePrice + extraSongs * (selection.packageInfo.extraSongPrice || 0);
   }
-  const finalTotal = Math.max(0, subtotal - discountAmount);
-  // Update info texts
-  const discountInfoEl = document.getElementById('discountInfo');
-  const finalTotalEl = document.getElementById('finalTotal');
-  if (discountType === 'none' || discountAmount === 0) {
-    discountInfoEl.textContent = '';
+  breakdown.push({ label: `${selection.packageInfo.label}${selection.songCount > 1 ? ` (${selection.songCount} faixas)` : ""}`, value: packageValue });
+  idealSubtotal += packageValue;
+
+  const extraVoices = Math.max(0, selection.vocals - (selection.packageInfo.includedVoices || 1));
+  if (extraVoices > 0) {
+    const value = extraVoices * settings.extraVoicePrice * Math.max(1, selection.songCount);
+    breakdown.push({ label: `Vozes adicionais (${extraVoices}x)`, value });
+    idealSubtotal += value;
+  }
+
+  if (selection.partnerStudioHours > 0) {
+    const value = selection.partnerStudioHours * (state.pricing.services.captacao_hora?.price || 0);
+    breakdown.push({ label: `Captação em estúdio parceiro (${selection.partnerStudioHours}h)`, value });
+    idealSubtotal += value;
+  }
+
+  if (selection.revisionRounds > 0) {
+    const value = selection.revisionRounds * settings.extraRevisionPrice;
+    breakdown.push({ label: `Revisões extras (${selection.revisionRounds}x)`, value });
+    idealSubtotal += value;
+  }
+
+  selection.selectedInstruments.forEach((item) => {
+    const value = item.qty * item.price * Math.max(1, selection.songCount);
+    breakdown.push({ label: `${item.label} (${item.qty}x)`, value });
+    idealSubtotal += value;
+  });
+
+  selection.selectedServices.forEach((item) => {
+    const multiplier = ["faixa", "música"].includes((item.unit || "").toLowerCase()) ? selection.songCount : 1;
+    const value = item.qty * item.price * multiplier;
+    breakdown.push({ label: `${item.label} (${item.qty}x)`, value });
+    idealSubtotal += value;
+  });
+
+  const complexityMultiplier = state.pricing.settings.complexityMultipliers[selection.productionType] || 1;
+  const priorityMultiplier = state.pricing.settings.priorityMultipliers[selection.priorityLevel] || 1;
+  const adjustedIdeal = roundCurrency(idealSubtotal * complexityMultiplier * priorityMultiplier * settings.idealFactor);
+  const healthyFloor = roundCurrency(adjustedIdeal * settings.healthyFactor);
+  const premiumValue = roundCurrency(adjustedIdeal * settings.premiumFactor);
+
+  return {
+    ...selection,
+    breakdown,
+    idealSubtotal: roundCurrency(idealSubtotal),
+    adjustedIdeal,
+    healthyFloor,
+    premiumValue,
+    complexityMultiplier,
+    priorityMultiplier,
+    formattedSubtotal: formatCurrency(roundCurrency(idealSubtotal)),
+    formattedIdeal: formatCurrency(adjustedIdeal),
+    formattedHealthyFloor: formatCurrency(healthyFloor),
+    formattedPremium: formatCurrency(premiumValue)
+  };
+}
+
+function updateSummary() {
+  const calculation = calculateQuote();
+  state.latestCalculation = calculation;
+
+  if (!calculation) return;
+
+  dom.summaryGrid.hidden = false;
+  dom.summaryState.hidden = true;
+  dom.healthyFloorDisplay.textContent = calculation.formattedHealthyFloor;
+  dom.idealPriceDisplay.textContent = calculation.formattedIdeal;
+  dom.premiumPriceDisplay.textContent = calculation.formattedPremium;
+  dom.actionIdealValue.textContent = calculation.formattedIdeal;
+  dom.summaryDetail.innerHTML = `
+    <div class="payment-line"><span>Pacote base</span><strong>${calculation.packageInfo.label}</strong></div>
+    <div class="payment-line"><span>Subtotal dos itens</span><strong>${calculation.formattedSubtotal}</strong></div>
+    <div class="payment-line"><span>Complexidade</span><strong>${multiplierLabel(calculation.complexityMultiplier)}</strong></div>
+    <div class="payment-line"><span>Prazo</span><strong>${multiplierLabel(calculation.priorityMultiplier)}</strong></div>
+    <div class="payment-line"><span>Faixas / vozes</span><strong>${calculation.songCount} / ${calculation.vocals}</strong></div>
+  `;
+}
+
+function renderReview() {
+  const quote = buildQuotePayload();
+  state.latestQuote = quote;
+
+  dom.reviewContent.innerHTML = `
+    <div class="review-panel">
+      <h3>Escopo resumido</h3>
+      <div class="payment-line"><span>Cliente</span><strong>${escapeHtml(quote.client.name)}</strong></div>
+      <div class="payment-line"><span>Projeto</span><strong>${escapeHtml(quote.client.artistName || quote.client.name)}</strong></div>
+      <div class="payment-line"><span>Pacote</span><strong>${escapeHtml(quote.packageInfo.label)}</strong></div>
+      <div class="payment-line"><span>Objetivo</span><strong>${escapeHtml(quote.client.releaseGoalLabel)}</strong></div>
+      <div class="payment-line"><span>Prioridade</span><strong>${escapeHtml(quote.client.priorityLabel)}</strong></div>
+    </div>
+    <div class="review-panel">
+      <h3>Composição do valor</h3>
+      <div class="table-scroll">
+        <table class="breakdown-table">
+          <thead>
+            <tr><th>Item</th><th>Valor</th></tr>
+          </thead>
+          <tbody>
+            ${quote.breakdown.map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.formattedValue}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="review-panel">
+      <h3>Faixas de decisão</h3>
+      <div class="payment-line"><span>Piso saudável</span><strong>${quote.calculations.healthyFloorFormatted}</strong></div>
+      <div class="payment-line"><span>Valor ideal Vale</span><strong>${quote.calculations.idealFormatted}</strong></div>
+      <div class="payment-line"><span>Referência premium</span><strong>${quote.calculations.premiumFormatted}</strong></div>
+      <div class="payment-line"><span>Perfil selecionado</span><strong>${quote.calculations.profileLabel}</strong></div>
+    </div>
+    <div class="review-panel">
+      <h3>Lógica da proposta</h3>
+      <p>${escapeHtml(quote.pitch)}</p>
+    </div>
+  `;
+
+  dom.reviewSubtotal.textContent = quote.calculations.profileValueFormatted;
+  dom.reviewDiscount.textContent = quote.calculations.discountFormatted;
+  dom.reviewTotal.textContent = quote.calculations.finalTotalFormatted;
+  dom.depositDisplay.textContent = quote.calculations.depositFormatted;
+  dom.paymentBreakdown.innerHTML = quote.paymentPlan.map((line) => `<div class="payment-line"><span>${escapeHtml(line.label)}</span><strong>${escapeHtml(line.value)}</strong></div>`).join("");
+
+  if (quote.calculations.isBelowHealthyFloor) {
+    dom.warningBox.hidden = false;
+    dom.warningBox.textContent = `Atenção: o valor final (${quote.calculations.finalTotalFormatted}) ficou abaixo do piso saudável (${quote.calculations.healthyFloorFormatted}). Use esse desconto apenas em situação excepcional.`;
   } else {
-    discountInfoEl.textContent = `Desconto aplicado: -${formatCurrency(discountAmount)}`;
+    dom.warningBox.hidden = true;
   }
-  finalTotalEl.textContent = `Total final: ${formatCurrency(finalTotal)}`;
-  currentQuote.discount = { type: discountType, value: discountValue, amount: discountAmount };
-  currentQuote.finalTotal = finalTotal;
 }
 
-// Handle confirmation (generate PDF)
-async function handleConfirm() {
-  if (!currentQuote) return;
-  const button = document.getElementById('confirmButton');
-  button.disabled = true;
-  button.textContent = 'Gerando...';
-  try {
-    const { data, breakdown, discount, finalTotal, subtotal } = currentQuote;
-    // Build breakdown including discount if applied
-    const finalBreakdown = [...breakdown];
-    if (discount && discount.amount > 0) {
-      finalBreakdown.push({ key: 'discount', label: 'Desconto', value: -discount.amount });
+function buildQuotePayload() {
+  const calculation = state.latestCalculation || calculateQuote();
+  const client = {
+    name: document.getElementById("clientName").value.trim(),
+    artistName: document.getElementById("clientArtistName").value.trim(),
+    email: document.getElementById("clientEmail").value.trim(),
+    phone: document.getElementById("clientPhone").value.trim(),
+    segment: document.getElementById("clientSegment").value,
+    segmentLabel: getSelectedLabel("clientSegment"),
+    salesChannel: document.getElementById("salesChannel").value,
+    salesChannelLabel: getSelectedLabel("salesChannel"),
+    songCount: calculation.songCount,
+    productionType: calculation.productionType,
+    productionTypeLabel: getSelectedLabel("productionType"),
+    priorityLevel: calculation.priorityLevel,
+    priorityLabel: getSelectedLabel("priorityLevel"),
+    releaseGoal: calculation.releaseGoal,
+    releaseGoalLabel: getSelectedLabel("releaseGoal"),
+    vocals: calculation.vocals,
+    partnerStudioHours: calculation.partnerStudioHours,
+    revisionRounds: calculation.revisionRounds,
+    references: document.getElementById("references").value.trim(),
+    notes: document.getElementById("notes").value.trim()
+  };
+
+  const discountType = dom.discountType.value;
+  const discountValueInput = clampNumber(dom.discountValue.value, 0);
+  const selectedProfile = dom.quoteProfile.value;
+  const profileMap = {
+    healthy: {
+      label: "Piso saudável",
+      value: calculation.healthyFloor
+    },
+    premium: {
+      label: "Referência premium",
+      value: calculation.premiumValue
+    },
+    ideal: {
+      label: "Valor ideal Vale",
+      value: calculation.adjustedIdeal
     }
-    // Total line will be drawn in PDF generator separately
-    // Generate pitch using subtotal (original total) or final total? Use final total for investment message
-    const pitch = generatePitch(data, finalBreakdown, finalTotal);
-    // Call PDF generator
-    await createPDF(data, finalBreakdown, finalTotal, pitch);
-    // Provide feedback
-    const feedback = document.getElementById('feedback');
-    if (feedback) {
-      feedback.hidden = false;
-      feedback.textContent = 'Orçamento gerado com sucesso! O download deve iniciar automaticamente.';
-    }
-  } catch (err) {
-    console.error(err);
-    const feedback = document.getElementById('feedback');
-    if (feedback) {
-      feedback.hidden = false;
-      feedback.style.color = '#ff7272';
-      feedback.textContent = 'Ocorreu um erro ao gerar o orçamento. Tente novamente.';
-    }
-  } finally {
-    const button2 = document.getElementById('confirmButton');
-    button2.disabled = false;
-    button2.textContent = 'Gerar PDF';
+  };
+  const profile = profileMap[selectedProfile] || profileMap.ideal;
+
+  let discount = 0;
+  if (discountType === "value") {
+    discount = discountValueInput;
+  } else if (discountType === "percentage") {
+    discount = roundCurrency(profile.value * (discountValueInput / 100));
   }
+  discount = Math.min(discount, profile.value);
+  const finalTotal = roundCurrency(Math.max(0, profile.value - discount));
+  const depositPercent = dom.paymentTemplate.value === "standard"
+    ? state.pricing.settings.depositPercent
+    : dom.paymentTemplate.value === "half"
+      ? 50
+      : state.pricing.settings.depositPercent;
+  const deposit = roundCurrency(finalTotal * (depositPercent / 100));
+  const balance = roundCurrency(finalTotal - deposit);
+
+  const paymentPlan = buildPaymentPlan(finalTotal, deposit, balance, dom.paymentTemplate.value);
+  const now = new Date();
+  const validUntil = new Date(now);
+  validUntil.setDate(validUntil.getDate() + state.pricing.settings.validityDays);
+  const number = generateQuoteNumber(now);
+
+  const quote = {
+    number,
+    issueDate: formatDate(now),
+    validUntil: formatDate(validUntil),
+    client,
+    packageInfo: calculation.packageInfo,
+    breakdown: calculation.breakdown.map((item) => ({ ...item, formattedValue: formatCurrency(item.value) })),
+    selections: {
+      instrumentLabels: calculation.selectedInstruments.map((item) => item.label),
+      serviceLabels: calculation.selectedServices.map((item) => item.label)
+    },
+    calculations: {
+      subtotal: calculation.idealSubtotal,
+      subtotalFormatted: calculation.formattedSubtotal,
+      healthyFloor: calculation.healthyFloor,
+      healthyFloorFormatted: calculation.formattedHealthyFloor,
+      ideal: calculation.adjustedIdeal,
+      idealFormatted: calculation.formattedIdeal,
+      premium: calculation.premiumValue,
+      premiumFormatted: calculation.formattedPremium,
+      profileLabel: profile.label,
+      profileValue: profile.value,
+      profileValueFormatted: formatCurrency(profile.value),
+      discount,
+      discountFormatted: formatCurrency(discount),
+      finalTotal,
+      finalTotalFormatted: formatCurrency(finalTotal),
+      deposit,
+      depositFormatted: formatCurrency(deposit),
+      balance,
+      balanceFormatted: formatCurrency(balance),
+      isBelowHealthyFloor: finalTotal < calculation.healthyFloor
+    },
+    paymentPlan,
+    meta: {
+      version: state.pricing.meta.version,
+      build: state.pricing.meta.build,
+      appName: state.pricing.meta.appName,
+      footerNote: state.pricing.settings.footerNote,
+      generatedAt: `${formatDate(now)} ${now.toLocaleTimeString("pt-BR")}`
+    }
+  };
+
+  quote.pitch = buildPitch(quote);
+  return quote;
+}
+
+function buildPaymentPlan(finalTotal, deposit, balance, template) {
+  switch (template) {
+    case "half":
+      return [
+        { label: "Entrada na aprovação", value: formatCurrency(roundCurrency(finalTotal / 2)) },
+        { label: "Saldo na entrega final", value: formatCurrency(roundCurrency(finalTotal - roundCurrency(finalTotal / 2))) }
+      ];
+    case "pix3": {
+      const first = deposit;
+      const remaining = roundCurrency(finalTotal - first);
+      const installment = roundCurrency(remaining / 3);
+      const lastInstallment = roundCurrency(remaining - installment * 2);
+      return [
+        { label: `Entrada (${state.pricing.settings.depositPercent}%)`, value: formatCurrency(first) },
+        { label: "Parcela 1 do saldo", value: formatCurrency(installment) },
+        { label: "Parcela 2 do saldo", value: formatCurrency(installment) },
+        { label: "Parcela 3 do saldo", value: formatCurrency(lastInstallment) }
+      ];
+    }
+    case "custom":
+      return [
+        { label: "Condição personalizada", value: "Definir na negociação" },
+        { label: "Sugestão-base", value: `${state.pricing.settings.depositPercent}% na aprovação e saldo na entrega` }
+      ];
+    default:
+      return [
+        { label: `Sinal (${state.pricing.settings.depositPercent}%)`, value: formatCurrency(deposit) },
+        { label: "Saldo na entrega", value: formatCurrency(balance) }
+      ];
+  }
+}
+
+function generateQuoteNumber(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${state.pricing.meta.quotePrefix || "VP"}-${yyyy}${mm}${dd}-${hh}${min}`;
+}
+
+function multiplierLabel(value) {
+  return `${value.toFixed(2).replace(".", ",")}x`;
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: state.pricing?.meta?.currency || "BRL"
+  }).format(value || 0);
+}
+
+function formatDate(date) {
+  return new Intl.DateTimeFormat("pt-BR").format(date);
+}
+
+function roundCurrency(value) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function clampNumber(value, min) {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric) || numeric < min) return min;
+  return numeric;
+}
+
+function getSelectedLabel(selectId) {
+  const select = document.getElementById(selectId);
+  return select.options[select.selectedIndex]?.textContent || "";
+}
+
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

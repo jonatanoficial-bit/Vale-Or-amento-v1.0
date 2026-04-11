@@ -1,183 +1,385 @@
-// admin.js
-// Script para gerenciar a área administrativa do aplicativo.
-// Permite login simples, gerenciamento de expansões (DLC) e exportação/importação de preços.
+import {
+  loadPricing,
+  savePricingOverride,
+  clearPricingOverride,
+  exportPricing,
+  importPricingJson,
+  getLocalExpansions,
+  saveLocalExpansions,
+  getQuoteHistory,
+  clearQuoteHistory,
+  downloadCsv,
+  getAdminPassword,
+  setAdminPassword
+} from "./dataStore.js";
 
-// Quando o DOM estiver pronto
-document.addEventListener('DOMContentLoaded', () => {
-  // Elementos
-  const loginCard = document.getElementById('adminLogin');
-  const adminPanel = document.getElementById('adminPanel');
-  const loginButton = document.getElementById('adminLoginButton');
-  const passwordInput = document.getElementById('adminPassword');
-  const loginError = document.getElementById('loginError');
-  const logoutBtn = document.getElementById('logoutBtn');
-  const addExpansionBtn = document.getElementById('addExpansionBtn');
-  const expansionModal = document.getElementById('expansionModal');
-  const expansionNameInput = document.getElementById('expansionName');
-  const expansionJsonInput = document.getElementById('expansionJson');
-  const saveExpansionBtn = document.getElementById('saveExpansionBtn');
-  const cancelExpansionBtn = document.getElementById('cancelExpansionBtn');
-  const expansionList = document.getElementById('expansionList');
-  const exportPricingBtn = document.getElementById('exportPricingBtn');
-  const pricingFileInput = document.getElementById('pricingFileInput');
+let pricing = null;
+let localExpansions = [];
 
-  // Set default password if not present
-  if (!localStorage.getItem('valeAdminPassword')) {
-    localStorage.setItem('valeAdminPassword', 'admin123');
+const dom = {};
+
+document.addEventListener("DOMContentLoaded", async () => {
+  cacheDom();
+  dom.currentYearAdmin.textContent = new Date().getFullYear();
+  bindBaseEvents();
+
+  try {
+    pricing = await loadPricing();
+    localExpansions = getLocalExpansions();
+    applyMeta();
+  } catch (error) {
+    console.error(error);
+    alert("Falha ao carregar a tabela administrativa.");
   }
+});
 
-  // Login handler
-  loginButton?.addEventListener('click', () => {
-    const entered = passwordInput.value.trim();
-    const saved = localStorage.getItem('valeAdminPassword');
-    if (entered === saved) {
-      // login success
-      loginCard.hidden = true;
-      adminPanel.hidden = false;
-      loadExpansionsUI();
-    } else {
-      loginError.hidden = false;
-    }
+function cacheDom() {
+  dom.adminLogin = document.getElementById("adminLogin");
+  dom.adminPanel = document.getElementById("adminPanel");
+  dom.passwordInput = document.getElementById("adminPassword");
+  dom.loginButton = document.getElementById("adminLoginButton");
+  dom.loginError = document.getElementById("loginError");
+  dom.meta = document.getElementById("adminMeta");
+  dom.depositPercent = document.getElementById("depositPercent");
+  dom.validityDays = document.getElementById("validityDays");
+  dom.healthyFactor = document.getElementById("healthyFactor");
+  dom.idealFactor = document.getElementById("idealFactor");
+  dom.premiumFactor = document.getElementById("premiumFactor");
+  dom.extraVoicePrice = document.getElementById("extraVoicePrice");
+  dom.extraRevisionPrice = document.getElementById("extraRevisionPrice");
+  dom.weekendSupportPrice = document.getElementById("weekendSupportPrice");
+  dom.saveSettingsButton = document.getElementById("saveSettingsButton");
+  dom.pricingTables = document.getElementById("pricingTables");
+  dom.savePricingButton = document.getElementById("savePricingButton");
+  dom.resetPricingButton = document.getElementById("resetPricingButton");
+  dom.exportPricingBtn = document.getElementById("exportPricingBtn");
+  dom.pricingFileInput = document.getElementById("pricingFileInput");
+  dom.expansionList = document.getElementById("expansionList");
+  dom.addExpansionBtn = document.getElementById("addExpansionBtn");
+  dom.expansionModal = document.getElementById("expansionModal");
+  dom.expansionModalTitle = document.getElementById("expansionModalTitle");
+  dom.expansionName = document.getElementById("expansionName");
+  dom.expansionJson = document.getElementById("expansionJson");
+  dom.saveExpansionBtn = document.getElementById("saveExpansionBtn");
+  dom.cancelExpansionBtn = document.getElementById("cancelExpansionBtn");
+  dom.marketReferenceList = document.getElementById("marketReferenceList");
+  dom.historyList = document.getElementById("historyList");
+  dom.exportHistoryButton = document.getElementById("exportHistoryButton");
+  dom.clearHistoryButton = document.getElementById("clearHistoryButton");
+  dom.newPassword = document.getElementById("newPassword");
+  dom.confirmPassword = document.getElementById("confirmPassword");
+  dom.changePasswordButton = document.getElementById("changePasswordButton");
+  dom.logoutBtn = document.getElementById("logoutBtn");
+  dom.currentYearAdmin = document.getElementById("currentYearAdmin");
+  dom.footerBuildInfoAdmin = document.getElementById("footerBuildInfoAdmin");
+  dom.versionNodes = document.querySelectorAll("[data-version]");
+  dom.buildNodes = document.querySelectorAll("[data-build]");
+}
+
+function bindBaseEvents() {
+  dom.loginButton.addEventListener("click", handleLogin);
+  dom.passwordInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") handleLogin();
   });
-
-  // Logout handler
-  logoutBtn?.addEventListener('click', () => {
-    adminPanel.hidden = true;
-    loginCard.hidden = false;
-    passwordInput.value = '';
-    loginError.hidden = true;
+  dom.logoutBtn.addEventListener("click", () => {
+    dom.adminPanel.hidden = true;
+    dom.adminLogin.hidden = false;
   });
+}
 
-  // Load expansions into list
-  function loadExpansionsUI() {
-    expansionList.innerHTML = '';
-    const expansions = getStoredExpansions();
-    const keys = Object.keys(expansions);
-    if (keys.length === 0) {
-      const empty = document.createElement('p');
-      empty.textContent = 'Nenhuma expansão adicionada.';
-      expansionList.appendChild(empty);
-    } else {
-      keys.forEach((id) => {
-        const item = expansions[id];
-        const wrapper = document.createElement('div');
-        wrapper.className = 'expansion-item';
-        const nameEl = document.createElement('span');
-        nameEl.className = 'expansion-name';
-        nameEl.textContent = item.name || id;
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'secondary-btn';
-        deleteBtn.textContent = 'Remover';
-        deleteBtn.addEventListener('click', () => deleteExpansion(id));
-        wrapper.appendChild(nameEl);
-        wrapper.appendChild(deleteBtn);
-        expansionList.appendChild(wrapper);
-      });
-    }
+function handleLogin() {
+  if (dom.passwordInput.value === getAdminPassword()) {
+    dom.loginError.hidden = true;
+    dom.adminLogin.hidden = true;
+    dom.adminPanel.hidden = false;
+    hydrateAdmin();
+  } else {
+    dom.loginError.hidden = false;
   }
+}
 
-  // Retrieve expansions from localStorage
-  function getStoredExpansions() {
-    const stored = localStorage.getItem('valeExpansions');
-    if (!stored) return {};
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error('Erro ao analisar expansões', e);
-      return {};
-    }
-  }
+function applyMeta() {
+  dom.versionNodes.forEach((node) => (node.textContent = pricing.meta.version));
+  dom.buildNodes.forEach((node) => (node.textContent = pricing.meta.build));
+  dom.footerBuildInfoAdmin.textContent = `Versão ${pricing.meta.version} • Build ${pricing.meta.build} • ${pricing.meta.builtAt}`;
+}
 
-  // Store expansions to localStorage
-  function saveExpansions(expansions) {
-    localStorage.setItem('valeExpansions', JSON.stringify(expansions));
-  }
+function hydrateAdmin() {
+  renderMeta();
+  hydrateSettings();
+  renderPricingTables();
+  renderExpansions();
+  renderMarketReferences();
+  renderHistory();
+  bindAdminEvents();
+}
 
-  // Delete expansion
-  function deleteExpansion(id) {
-    const expansions = getStoredExpansions();
-    if (confirm('Tem certeza que deseja remover esta expansão?')) {
-      delete expansions[id];
-      saveExpansions(expansions);
-      loadExpansionsUI();
-    }
-  }
-
-  // Show modal to add expansion
-  addExpansionBtn?.addEventListener('click', () => {
-    expansionNameInput.value = '';
-    expansionJsonInput.value = '';
-    expansionModal.hidden = false;
-  });
-
-  // Cancel modal
-  cancelExpansionBtn?.addEventListener('click', () => {
-    expansionModal.hidden = true;
-  });
-
-  // Save expansion from modal
-  saveExpansionBtn?.addEventListener('click', () => {
-    const name = expansionNameInput.value.trim();
-    const jsonText = expansionJsonInput.value.trim();
-    if (!name || !jsonText) {
-      alert('Preencha o nome e o conteúdo JSON da expansão.');
-      return;
-    }
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch (e) {
-      alert('O conteúdo JSON é inválido. Verifique a sintaxe.');
-      return;
-    }
-    const expansions = getStoredExpansions();
-    const id = `${name.toLowerCase().replace(/\s+/g, '_')}_${Date.now()}`;
-    expansions[id] = { name, ...parsed };
-    saveExpansions(expansions);
-    expansionModal.hidden = true;
-    loadExpansionsUI();
-    alert('Expansão adicionada com sucesso! Para que seja carregada no aplicativo, atualize a página inicial.');
-  });
-
-  // Export pricing
-  exportPricingBtn?.addEventListener('click', async () => {
-    // Carrega pricing atual (base + expansões) e exporta como arquivo
-    try {
-      const baseRes = await fetch('data/pricing.json');
-      const base = await baseRes.json();
-      // merge expansions
-      const expansions = getStoredExpansions();
-      let combined = JSON.parse(JSON.stringify(base));
-      Object.values(expansions).forEach((exp) => {
-        if (exp.instrumentos) combined.instrumentos = { ...combined.instrumentos, ...exp.instrumentos };
-        if (exp.servicos) combined.servicos = { ...combined.servicos, ...exp.servicos };
-      });
-      const blob = new Blob([JSON.stringify(combined, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'pricing_export.json';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      alert('Erro ao exportar tabela: ' + e.message);
-    }
-  });
-
-  // Import pricing
-  pricingFileInput?.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+function bindAdminEvents() {
+  dom.saveSettingsButton.onclick = saveSettings;
+  dom.savePricingButton.onclick = savePricingChanges;
+  dom.resetPricingButton.onclick = async () => {
+    clearPricingOverride();
+    pricing = await loadPricing();
+    hydrateAdmin();
+  };
+  dom.exportPricingBtn.onclick = () => exportPricing(pricing);
+  dom.pricingFileInput.onchange = async (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
     try {
-      const text = await file.text();
-      const parsed = JSON.parse(text);
-      // Save parsed pricing in localStorage override
-      localStorage.setItem('valePricingOverride', JSON.stringify(parsed));
-      alert('Nova tabela de preços importada com sucesso! Atualize a página inicial para aplicar as alterações.');
-    } catch (err) {
-      alert('Falha ao importar tabela: ' + err.message);
+      const imported = await importPricingJson(file);
+      savePricingOverride(imported);
+      pricing = await loadPricing();
+      hydrateAdmin();
+      alert("Tabela importada com sucesso.");
+    } catch {
+      alert("JSON inválido.");
+    }
+  };
+  dom.addExpansionBtn.onclick = openExpansionModal;
+  dom.cancelExpansionBtn.onclick = closeExpansionModal;
+  dom.saveExpansionBtn.onclick = saveExpansion;
+  dom.exportHistoryButton.onclick = exportHistory;
+  dom.clearHistoryButton.onclick = () => {
+    if (!confirm("Tem certeza que deseja limpar o histórico local?")) return;
+    clearQuoteHistory();
+    renderHistory();
+  };
+  dom.changePasswordButton.onclick = changePassword;
+}
+
+function renderMeta() {
+  dom.meta.innerHTML = `
+    <div class="meta-pill"><span>App</span><strong>${pricing.meta.appName}</strong></div>
+    <div class="meta-pill"><span>Estratégia</span><strong>${pricing.meta.strategy}</strong></div>
+    <div class="meta-pill"><span>Versão</span><strong>${pricing.meta.version}</strong></div>
+    <div class="meta-pill"><span>Build</span><strong>${pricing.meta.build}</strong></div>
+    <div class="meta-pill"><span>Atualizado em</span><strong>${pricing.meta.builtAt}</strong></div>
+    <div class="meta-pill"><span>Senha ativa</span><strong>Personalizável</strong></div>
+  `;
+}
+
+function hydrateSettings() {
+  dom.depositPercent.value = pricing.settings.depositPercent;
+  dom.validityDays.value = pricing.settings.validityDays;
+  dom.healthyFactor.value = pricing.settings.healthyFactor;
+  dom.idealFactor.value = pricing.settings.idealFactor;
+  dom.premiumFactor.value = pricing.settings.premiumFactor;
+  dom.extraVoicePrice.value = pricing.settings.extraVoicePrice;
+  dom.extraRevisionPrice.value = pricing.settings.extraRevisionPrice;
+  dom.weekendSupportPrice.value = pricing.settings.weekendSupportPrice;
+}
+
+function renderPricingTables() {
+  dom.pricingTables.innerHTML = `
+    ${renderTableCard("Pacotes", pricing.packages, "package")}
+    ${renderTableCard("Instrumentos / elementos", pricing.instruments, "instrument")}
+    ${renderTableCard("Serviços adicionais", pricing.services, "service")}
+  `;
+}
+
+function renderTableCard(title, data, type) {
+  return `
+    <div class="admin-table-card">
+      <h3>${title}</h3>
+      <div class="table-scroll">
+        <table class="price-table">
+          <thead>
+            <tr><th>Item</th><th>Descrição</th><th>Preço (R$)</th></tr>
+          </thead>
+          <tbody>
+            ${Object.entries(data)
+              .map(([id, item]) => `
+                <tr>
+                  <td>${item.label}</td>
+                  <td>${item.description || item.category || item.unit || "-"}</td>
+                  <td><input type="number" step="1" min="0" data-price-type="${type}" data-price-id="${id}" value="${item.basePrice ?? item.price}" /></td>
+                </tr>`)
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function saveSettings() {
+  const override = {
+    settings: {
+      depositPercent: Number(dom.depositPercent.value),
+      validityDays: Number(dom.validityDays.value),
+      healthyFactor: Number(dom.healthyFactor.value),
+      idealFactor: Number(dom.idealFactor.value),
+      premiumFactor: Number(dom.premiumFactor.value),
+      extraVoicePrice: Number(dom.extraVoicePrice.value),
+      extraRevisionPrice: Number(dom.extraRevisionPrice.value),
+      weekendSupportPrice: Number(dom.weekendSupportPrice.value)
+    }
+  };
+  savePricingOverride(override);
+  pricing = mergePricing(pricing, override);
+  alert("Parâmetros comerciais salvos.");
+}
+
+function savePricingChanges() {
+  const override = { packages: {}, instruments: {}, services: {} };
+  dom.pricingTables.querySelectorAll("[data-price-id]").forEach((input) => {
+    const type = input.dataset.priceType;
+    const id = input.dataset.priceId;
+    const value = Number(input.value || 0);
+    if (type === "package") {
+      override.packages[id] = { basePrice: value };
+    } else if (type === "instrument") {
+      override.instruments[id] = { price: value };
+    } else {
+      override.services[id] = { price: value };
     }
   });
-});
+  savePricingOverride(override);
+  pricing = mergePricing(pricing, override);
+  alert("Tabela de preços salva.");
+}
+
+function renderExpansions() {
+  if (!localExpansions.length) {
+    dom.expansionList.innerHTML = '<div class="expansion-card">Nenhuma expansão local cadastrada.</div>';
+    return;
+  }
+
+  dom.expansionList.innerHTML = localExpansions
+    .map((expansion, index) => `
+      <div class="expansion-card">
+        <div class="footer-inline">
+          <strong>${expansion.name}</strong>
+          <button class="secondary-btn" data-remove-expansion="${index}">Remover</button>
+        </div>
+        <pre>${escapeHtml(JSON.stringify(expansion.payload, null, 2))}</pre>
+      </div>`)
+    .join("");
+
+  dom.expansionList.querySelectorAll("[data-remove-expansion]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.removeExpansion);
+      localExpansions.splice(index, 1);
+      saveLocalExpansions(localExpansions);
+      renderExpansions();
+    });
+  });
+}
+
+function openExpansionModal() {
+  dom.expansionModal.hidden = false;
+  dom.expansionName.value = "";
+  dom.expansionJson.value = "";
+}
+
+function closeExpansionModal() {
+  dom.expansionModal.hidden = true;
+}
+
+function saveExpansion() {
+  try {
+    const payload = JSON.parse(dom.expansionJson.value);
+    localExpansions.push({ name: dom.expansionName.value.trim() || "Expansão", payload });
+    saveLocalExpansions(localExpansions);
+    closeExpansionModal();
+    renderExpansions();
+    alert("Expansão salva.");
+  } catch {
+    alert("JSON da expansão é inválido.");
+  }
+}
+
+function renderMarketReferences() {
+  dom.marketReferenceList.innerHTML = pricing.marketReferences
+    .map((item) => `
+      <div class="reference-card">
+        <div>
+          <strong>${item.source}</strong>
+          <p>${item.summary}</p>
+        </div>
+        <span class="badge">${item.positioning}</span>
+      </div>`)
+    .join("");
+}
+
+function renderHistory() {
+  const history = getQuoteHistory();
+  if (!history.length) {
+    dom.historyList.innerHTML = '<div class="history-item">Nenhum orçamento gerado neste navegador ainda.</div>';
+    return;
+  }
+
+  dom.historyList.innerHTML = history
+    .map((entry) => `
+      <div class="history-item">
+        <div>
+          <strong>${entry.number}</strong>
+          <p>${escapeHtml(entry.client)} ${entry.artist ? `• ${escapeHtml(entry.artist)}` : ""}</p>
+          <small>${escapeHtml(entry.packageLabel)} • ${escapeHtml(entry.profileLabel)}</small>
+        </div>
+        <div>
+          <strong>${escapeHtml(entry.finalValue)}</strong>
+          <p><small>${escapeHtml(entry.generatedAt)}</small></p>
+        </div>
+      </div>`)
+    .join("");
+}
+
+function exportHistory() {
+  const history = getQuoteHistory();
+  if (!history.length) {
+    alert("Nenhum orçamento no histórico.");
+    return;
+  }
+  const rows = [
+    ["numero", "data", "cliente", "artista", "pacote", "perfil", "valor_final", "valor_base", "desconto"],
+    ...history.map((item) => [item.number, item.generatedAt, item.client, item.artist, item.packageLabel, item.profileLabel, item.finalValue, item.profileValue, item.discount])
+  ];
+  downloadCsv("vale-historico-orcamentos.csv", rows);
+}
+
+function changePassword() {
+  const password = dom.newPassword.value;
+  const confirmPassword = dom.confirmPassword.value;
+  if (!password || password.length < 6) {
+    alert("A nova senha precisa ter pelo menos 6 caracteres.");
+    return;
+  }
+  if (password !== confirmPassword) {
+    alert("As senhas não coincidem.");
+    return;
+  }
+  setAdminPassword(password);
+  dom.newPassword.value = "";
+  dom.confirmPassword.value = "";
+  alert("Senha atualizada com sucesso.");
+}
+
+function mergePricing(base, override) {
+  const result = structuredClone(base);
+  for (const [section, values] of Object.entries(override)) {
+    if (typeof values !== "object" || Array.isArray(values)) {
+      result[section] = values;
+      continue;
+    }
+    result[section] = result[section] || {};
+    for (const [id, payload] of Object.entries(values)) {
+      if (typeof payload !== "object" || Array.isArray(payload)) {
+        result[section][id] = payload;
+      } else {
+        result[section][id] = { ...(result[section][id] || {}), ...payload };
+      }
+    }
+  }
+  return result;
+}
+
+function escapeHtml(text) {
+  return String(text || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}

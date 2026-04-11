@@ -1,37 +1,338 @@
 {
-  "instrumentos": {
-    "violao": { "label": "Violão", "price": 300 },
-    "guitarra": { "label": "Guitarra", "price": 400 },
-    "baixo": { "label": "Baixo", "price": 350 },
-    "bateria": { "label": "Bateria", "price": 500 },
-    "teclado": { "label": "Teclado / Piano", "price": 450 },
-    "percussao": { "label": "Percussão", "price": 300 },
-    "sopro": { "label": "Sopro (Sax, Trompete)", "price": 450 },
-    "cordas": { "label": "Cordas (Violino, Cello)", "price": 500 }
+  "meta": {
+    "appName": "Vale Orçamento Pro",
+    "company": "Vale Produção",
+    "version": "2.0.0",
+    "build": "20260411-103916",
+    "builtAt": "2026-04-11 10:39:16 -03",
+    "currency": "BRL",
+    "locale": "pt-BR",
+    "strategy": "Produtora que pensa como gravadora",
+    "quotePrefix": "VP"
   },
-  "voz": 280,
-  "servicos": {
-    "mixagem": { "label": "Mixagem Profissional", "price": 480 },
-    "masterizacao": { "label": "Masterização", "price": 300 },
-    "pos_producao_pacote": { "label": "Mixagem + Masterização (pacote)", "price": 700 },
-    "composicao": { "label": "Composição/Arranjo", "price": 650 },
-    "design_capa": { "label": "Design de Capa", "price": 250 },
-    "distribuicao": { "label": "Distribuição digital (lançamento)", "price": 150 },
-    "marketing": { "label": "Marketing básico (1 campanha)", "price": 350 },
-    "video_clip": { "label": "Produção de Videoclipe (base)", "price": 1500 }
-  }
-  ,
-  "producao": {
-    "single": { "label": "Single (Voz + Base Vale Produções)", "price": 650 },
-    "ia": { "label": "Produção com IA (Instrumental)", "price": 450 }
+  "settings": {
+    "depositPercent": 70,
+    "validityDays": 7,
+    "healthyFactor": 0.88,
+    "idealFactor": 1,
+    "premiumFactor": 1.18,
+    "extraVoicePrice": 95,
+    "extraRevisionPrice": 90,
+    "weekendSupportPrice": 250,
+    "priorityMultipliers": {
+      "normal": 1,
+      "priority": 1.12,
+      "express": 1.25
+    },
+    "complexityMultipliers": {
+      "solo": 1,
+      "duo": 1.05,
+      "banda": 1.12,
+      "instrumental": 1.03,
+      "especial": 1.15
+    },
+    "paymentTemplates": {
+      "standard": [
+        "70% na aprovação",
+        "30% na entrega final ou antes do upload/distribuição"
+      ],
+      "half": [
+        "50% na aprovação",
+        "50% na entrega final"
+      ],
+      "pix3": [
+        "Entrada mínima conforme negociação",
+        "Saldo em até 3 parcelas iguais"
+      ],
+      "custom": [
+        "Condição personalizada a combinar em proposta"
+      ]
+    },
+    "footerNote": "Valores podem variar conforme complexidade artística, volume de revisões, prazo, estúdio parceiro e contratação de músicos externos."
   },
-  "edicao": {
-    "instrumento": { "label": "Edição de instrumento", "price": 200 },
-    "voz": { "label": "Edição de voz (por voz)", "price": 220 }
+  "marketReferences": [
+    {
+      "source": "Home Studio Brasil",
+      "summary": "Mixagem R$180 e masterização R$90 por música",
+      "positioning": "entrada / home studio"
+    },
+    {
+      "source": "Estúdio JR Produções",
+      "summary": "Hora de estúdio R$150 e mixagem R$200 por faixa",
+      "positioning": "referência local de estúdio"
+    },
+    {
+      "source": "Jacarandá Audio",
+      "summary": "Masterização online R$250 e mixagem standard R$750",
+      "positioning": "referência premium técnica"
+    },
+    {
+      "source": "Fil Buc Produções",
+      "summary": "Produção completa independente entre R$2.000 e R$3.000; hora R$125",
+      "positioning": "referência independente consolidada"
+    },
+    {
+      "source": "Produção Musical Online",
+      "summary": "Produções acústicas a partir de R$790 e banda a partir de R$1.250",
+      "positioning": "pacotes acessíveis de mercado"
+    }
+  ],
+  "packages": {
+    "single_essencial": {
+      "label": "Single Essencial",
+      "category": "Pacotes principais",
+      "description": "Entrada profissional com produção base, direção e organização de sessão.",
+      "basePrice": 790,
+      "pricingMode": "per_song",
+      "includedSongs": 1,
+      "includedVoices": 1,
+      "includes": [
+        "Pré-produção",
+        "Direção artística básica",
+        "Produção instrumental base",
+        "Organização de sessão"
+      ]
+    },
+    "single_profissional": {
+      "label": "Single Profissional",
+      "category": "Pacotes principais",
+      "description": "Pacote principal da Vale para single competitivo.",
+      "basePrice": 1490,
+      "pricingMode": "per_song",
+      "includedSongs": 1,
+      "includedVoices": 1,
+      "includes": [
+        "Produção completa",
+        "Direção vocal",
+        "Edição base",
+        "Mixagem",
+        "Masterização"
+      ]
+    },
+    "single_premium": {
+      "label": "Single Premium + Lançamento",
+      "category": "Pacotes principais",
+      "description": "Single prioritário com foco em posicionamento e entrega executiva.",
+      "basePrice": 2490,
+      "pricingMode": "per_song",
+      "includedSongs": 1,
+      "includedVoices": 2,
+      "includes": [
+        "Produção completa",
+        "Direção artística ampliada",
+        "Mixagem e masterização",
+        "Pitch inicial e setup de lançamento",
+        "Reunião estratégica"
+      ]
+    },
+    "ep_4": {
+      "label": "EP Profissional (4 faixas)",
+      "category": "Projetos maiores",
+      "description": "Projeto em escala para artista em fase de construção de catálogo.",
+      "basePrice": 5200,
+      "pricingMode": "project",
+      "includedSongs": 4,
+      "extraSongPrice": 1250,
+      "includedVoices": 2,
+      "includes": [
+        "Direção do projeto",
+        "Produção das 4 faixas",
+        "Mixagem e masterização",
+        "Plano macro de lançamento"
+      ]
+    },
+    "album_8": {
+      "label": "Álbum / Projeto 8 faixas",
+      "category": "Projetos maiores",
+      "description": "Pacote com ganho de escala para repertório robusto.",
+      "basePrice": 9800,
+      "pricingMode": "project",
+      "includedSongs": 8,
+      "extraSongPrice": 1150,
+      "includedVoices": 2,
+      "includes": [
+        "Direção artística do álbum",
+        "Produção das faixas incluídas",
+        "Mixagem e masterização",
+        "Reuniões de acompanhamento"
+      ]
+    },
+    "mix_master_only": {
+      "label": "Mix + Master (faixa pronta)",
+      "category": "Pós-produção",
+      "description": "Para músicas já produzidas que precisam de acabamento comercial.",
+      "basePrice": 520,
+      "pricingMode": "per_song",
+      "includedSongs": 1,
+      "includedVoices": 1,
+      "includes": [
+        "Análise técnica do material",
+        "Mixagem",
+        "Masterização",
+        "Até 2 revisões"
+      ]
+    }
   },
-  "carreira": {
-    "3m": { "label": "Gestão de carreira (3 meses)", "price": 1440 },
-    "6m": { "label": "Gestão de carreira (6 meses)", "price": 2880 },
-    "12m": { "label": "Gestão de carreira (12 meses)", "price": 5760 }
+  "instruments": {
+    "violao": {
+      "label": "Violão / guitarra base adicional",
+      "price": 120,
+      "description": "Camada extra de arranjo ou textura"
+    },
+    "baixo": {
+      "label": "Baixo / bass synth",
+      "price": 130,
+      "description": "Linha dedicada de groove"
+    },
+    "teclas": {
+      "label": "Teclas / piano / pads",
+      "price": 140,
+      "description": "Ambiência, harmonia ou melodia adicional"
+    },
+    "beat_plus": {
+      "label": "Programação rítmica premium",
+      "price": 150,
+      "description": "Beat / groove com design superior"
+    },
+    "bateria_live": {
+      "label": "Bateria ou percussionista ao vivo",
+      "price": 260,
+      "description": "Complexidade e direção de músico externo"
+    },
+    "backing": {
+      "label": "Backing vocal adicional",
+      "price": 90,
+      "description": "Camada vocal de reforço"
+    },
+    "cordas": {
+      "label": "Cordas / arranjo orquestral base",
+      "price": 260,
+      "description": "Strings, quartetos ou camadas orquestrais"
+    },
+    "sanfona": {
+      "label": "Sanfona / acordeon",
+      "price": 220,
+      "description": "Elemento regional / assinatura sonora"
+    },
+    "sopro": {
+      "label": "Sopro solo",
+      "price": 250,
+      "description": "Lead instrumental ou frase de impacto"
+    },
+    "fx": {
+      "label": "Sound design / FX especiais",
+      "price": 180,
+      "description": "Transições, texturas e assinatura de produção"
+    }
+  },
+  "services": {
+    "captacao_hora": {
+      "label": "Captação em estúdio parceiro (hora)",
+      "price": 150,
+      "unit": "hora",
+      "category": "Pré-produção"
+    },
+    "edicao_vocal": {
+      "label": "Edição vocal",
+      "price": 120,
+      "unit": "faixa",
+      "category": "Pós-produção"
+    },
+    "afinacao_vocal": {
+      "label": "Afinação vocal",
+      "price": 100,
+      "unit": "faixa",
+      "category": "Pós-produção"
+    },
+    "mixagem": {
+      "label": "Mixagem avulsa",
+      "price": 350,
+      "unit": "faixa",
+      "category": "Pós-produção"
+    },
+    "masterizacao": {
+      "label": "Masterização avulsa",
+      "price": 150,
+      "unit": "faixa",
+      "category": "Pós-produção"
+    },
+    "guia_arranjo": {
+      "label": "Guia harmônica / arranjo adicional",
+      "price": 180,
+      "unit": "faixa",
+      "category": "Pré-produção"
+    },
+    "beat_custom": {
+      "label": "Beat original / instrumental sob medida",
+      "price": 650,
+      "unit": "faixa",
+      "category": "Produção"
+    },
+    "capa": {
+      "label": "Capa profissional",
+      "price": 220,
+      "unit": "projeto",
+      "category": "Lançamento"
+    },
+    "lyric_video": {
+      "label": "Lyric video simples",
+      "price": 450,
+      "unit": "faixa",
+      "category": "Lançamento"
+    },
+    "distribuicao_upload": {
+      "label": "Setup de distribuição / metadata",
+      "price": 140,
+      "unit": "faixa",
+      "category": "Lançamento"
+    },
+    "pitching": {
+      "label": "Pitch editorial + plano de lançamento",
+      "price": 390,
+      "unit": "projeto",
+      "category": "Lançamento"
+    },
+    "trafego_inicial": {
+      "label": "Planejamento de tráfego inicial",
+      "price": 290,
+      "unit": "projeto",
+      "category": "Lançamento"
+    },
+    "campanha_30": {
+      "label": "Campanha digital 30 dias",
+      "price": 890,
+      "unit": "projeto",
+      "category": "Gestão e marketing"
+    },
+    "gestao_3m": {
+      "label": "Acompanhamento estratégico 3 meses",
+      "price": 2400,
+      "unit": "projeto",
+      "category": "Gestão e marketing"
+    },
+    "gestao_6m": {
+      "label": "Acompanhamento estratégico 6 meses",
+      "price": 4500,
+      "unit": "projeto",
+      "category": "Gestão e marketing"
+    },
+    "consultoria": {
+      "label": "Consultoria artística / repertório (1h30)",
+      "price": 250,
+      "unit": "sessão",
+      "category": "Estratégia"
+    },
+    "registro_isrc": {
+      "label": "Organização de ISRC / metadata",
+      "price": 90,
+      "unit": "faixa",
+      "category": "Lançamento"
+    },
+    "weekend_support": {
+      "label": "Atendimento extraordinário / fim de semana",
+      "price": 250,
+      "unit": "projeto",
+      "category": "Estratégia"
+    }
   }
 }

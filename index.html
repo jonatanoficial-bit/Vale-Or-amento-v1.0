@@ -1,125 +1,334 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Gerador de Orçamento &ndash; Vale Produções</title>
-    <!-- Styles -->
-    <link rel="stylesheet" href="css/style.css" />
-    <!-- jsPDF CDN for PDF generation -->
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Main application scripts -->
-    <script defer type="module" src="js/main.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vale Orçamento Pro - Vale Produção</title>
+  <meta name="description" content="Gerador de orçamento profissional da Vale Produção com preços calibrados ao mercado, sugestões automáticas e PDF executivo." />
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script defer type="module" src="js/main.js"></script>
 </head>
 <body>
-    <header class="app-header">
-        <img src="assets/logo.png" alt="Logo da Vale Produções" class="logo" />
-        <h1>Gerador de Orçamento</h1>
-    </header>
-    <main>
-        <form id="quoteForm">
-            <section class="card">
-                <h2>Dados do Cliente</h2>
-                <div class="form-group">
-                    <label for="clientName">Nome do cliente*</label>
-                    <input type="text" id="clientName" name="clientName" placeholder="Ex.: João Silva" required />
-                </div>
-                <div class="form-group">
-                    <label for="clientEmail">E‑mail*</label>
-                    <input type="email" id="clientEmail" name="clientEmail" placeholder="Ex.: cliente@email.com" required />
-                </div>
-                <div class="form-group">
-                    <label for="clientPhone">Telefone</label>
-                    <input type="tel" id="clientPhone" name="clientPhone" placeholder="(xx) xxxxx‑xxxx" />
-                </div>
-            </section>
-            <section class="card">
-                <h2>Detalhes da Produção</h2>
-                <!-- Serviço de Produção -->
-                <div class="form-group">
-                    <label for="productionService">Serviço de produção</label>
-                    <select id="productionService" name="productionService">
-                        <option value="none">Selecionar...</option>
-                        <option value="single">Single (Voz + Base Vale Produções) &ndash; R$ 650</option>
-                        <option value="ia">Produção com IA (Instrumental) &ndash; R$ 450</option>
-                    </select>
-                    <small class="hint">A produção com IA pode incluir custos adicionais de edição de instrumentos e vozes.</small>
-                </div>
-                <!-- Plano de gerenciamento de carreira -->
-                <div class="form-group">
-                    <label for="careerPlan">Plano de gerenciamento de carreira</label>
-                    <select id="careerPlan" name="careerPlan">
-                        <option value="none">Nenhum</option>
-                        <option value="3m">3 meses &ndash; R$ 1.440</option>
-                        <option value="6m">6 meses &ndash; R$ 2.880</option>
-                        <option value="12m">12 meses &ndash; R$ 5.760</option>
-                    </select>
-                    <small class="hint">Planos incluem criação e manutenção de site, redes sociais e análise em plataformas digitais.</small>
-                </div>
-                <div class="form-group">
-                    <label for="productionType">Tipo de produção</label>
-                    <select id="productionType" name="productionType">
-                        <option value="banda">Banda completa</option>
-                        <option value="solo">Artista solo</option>
-                        <option value="instrumental">Instrumental</option>
-                        <option value="outro">Outro</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="vocals">Número de vozes</label>
-                    <input type="number" id="vocals" name="vocals" min="0" value="1" />
-                </div>
-                <div class="form-group instruments-section">
-                    <h3>Instrumentos</h3>
-                    <p>Selecione os instrumentos e quantidades:</p>
-                    <div id="instrumentList" class="instrument-list"></div>
-                </div>
-                <div class="form-group services-section">
-                    <h3>Serviços adicionais</h3>
-                    <div id="serviceList" class="service-list"></div>
-                </div>
-            </section>
-            <section class="card">
-                <h2>Observações</h2>
-                <div class="form-group">
-                    <label for="notes">Descreva quaisquer informações adicionais que julgar importantes</label>
-                    <textarea id="notes" name="notes" rows="4" placeholder="Ex.: Referências musicais, necessidades especiais..."></textarea>
-                </div>
-            </section>
-            <div class="action-bar" id="formActions">
-                <button type="button" id="nextButton" class="primary-btn">Continuar</button>
-                <div id="subtotalDisplay" class="total-cost"></div>
-            </div>
-        </form>
-        <div id="feedback" class="feedback" hidden></div>
+  <header class="app-header">
+    <div class="brand-wrap">
+      <img src="assets/logo.svg" alt="Logo da Vale Produção" class="logo" />
+      <div>
+        <p class="eyebrow">Produtora que pensa como gravadora</p>
+        <h1>Vale Orçamento Pro</h1>
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-primary">Versão <span data-version>2.0.0</span></span>
+      <span class="badge">Build <span data-build>20260411-103916</span></span>
+    </div>
+  </header>
 
-        <!-- Revisão e desconto -->
-        <section id="reviewSection" class="card" hidden>
-            <h2>Revisão do Orçamento</h2>
-            <div id="reviewContent"></div>
-            <div class="form-group">
-                <label for="discountType">Tipo de desconto</label>
-                <select id="discountType" name="discountType">
-                    <option value="none">Nenhum</option>
-                    <option value="value">Valor fixo (R$)</option>
-                    <option value="percentage">Percentual (%)</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="discountValue">Valor do desconto</label>
-                <input type="number" id="discountValue" name="discountValue" min="0" value="0" disabled />
-            </div>
-            <div id="discountInfo" class="total-cost"></div>
-            <div id="finalTotal" class="total-cost"></div>
-            <div class="action-bar">
-                <button type="button" id="backButton" class="secondary-btn">Voltar</button>
-                <button type="button" id="confirmButton" class="primary-btn">Gerar PDF</button>
-            </div>
-        </section>
-    </main>
-    <footer class="app-footer">
-        <p>© <span id="currentYear"></span> Vale Produções &ndash; Todos os direitos reservados.</p>
-        <a href="admin.html" class="admin-link">Área Administrativa</a>
-    </footer>
+  <main class="layout-grid">
+    <section class="hero card card-highlight">
+      <div>
+        <p class="eyebrow">Nova visão comercial</p>
+        <h2>Orçamentos mais estratégicos, com piso saudável, valor ideal e referência premium.</h2>
+        <p>
+          Esta versão foi recalibrada para a nova fase da Vale Produção: proteger margem,
+          valorizar direção artística e transformar o orçamento em proposta profissional.
+        </p>
+      </div>
+      <div class="hero-metrics">
+        <div class="metric-card">
+          <span class="metric-label">Sinal padrão</span>
+          <strong class="metric-value" data-deposit-badge>70%</strong>
+          <small>na aprovação</small>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Validade</span>
+          <strong class="metric-value" data-validity-badge>7 dias</strong>
+          <small>por orçamento</small>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Perfil padrão</span>
+          <strong class="metric-value">Ideal</strong>
+          <small>comercial Vale</small>
+        </div>
+      </div>
+    </section>
+
+    <aside class="summary-panel card">
+      <div class="summary-header">
+        <h2>Resumo automático</h2>
+        <span class="badge">Atualiza em tempo real</span>
+      </div>
+      <div id="summaryState" class="summary-state">Preencha o projeto para ver a recomendação.</div>
+      <div class="summary-grid" hidden id="summaryGrid">
+        <div class="summary-box">
+          <span>Piso saudável</span>
+          <strong id="healthyFloorDisplay">R$ 0,00</strong>
+          <small>use só em negociação pontual</small>
+        </div>
+        <div class="summary-box summary-box-primary">
+          <span>Valor ideal</span>
+          <strong id="idealPriceDisplay">R$ 0,00</strong>
+          <small>preço recomendado Vale</small>
+        </div>
+        <div class="summary-box">
+          <span>Referência premium</span>
+          <strong id="premiumPriceDisplay">R$ 0,00</strong>
+          <small>projetos prioritários / urgentes</small>
+        </div>
+      </div>
+      <div class="summary-detail" id="summaryDetail"></div>
+    </aside>
+
+    <form id="quoteForm" class="form-grid">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">1. Cliente</p>
+            <h2>Dados do cliente</h2>
+          </div>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="clientName">Nome do cliente*</label>
+            <input type="text" id="clientName" name="clientName" placeholder="Ex.: João Silva" required />
+          </div>
+          <div class="form-group">
+            <label for="clientArtistName">Nome artístico / projeto</label>
+            <input type="text" id="clientArtistName" name="clientArtistName" placeholder="Ex.: Ministério X / Banda Y" />
+          </div>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="clientEmail">E-mail*</label>
+            <input type="email" id="clientEmail" name="clientEmail" placeholder="Ex.: contato@email.com" required />
+          </div>
+          <div class="form-group">
+            <label for="clientPhone">Telefone / WhatsApp</label>
+            <input type="tel" id="clientPhone" name="clientPhone" placeholder="(xx) xxxxx-xxxx" />
+          </div>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="clientSegment">Segmento</label>
+            <select id="clientSegment" name="clientSegment">
+              <option value="artista-independente">Artista independente</option>
+              <option value="banda">Banda / grupo</option>
+              <option value="igreja-ministerio">Igreja / ministério</option>
+              <option value="criador">Criador / audiovisual</option>
+              <option value="empresa">Empresa / institucional</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="salesChannel">Origem do lead</label>
+            <select id="salesChannel" name="salesChannel">
+              <option value="instagram">Instagram</option>
+              <option value="indicacao">Indicação</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="site">Site</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">2. Escopo</p>
+            <h2>Projeto e pacote</h2>
+          </div>
+          <span class="badge badge-soft">Automação comercial Vale</span>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="packageSelect">Pacote principal*</label>
+            <select id="packageSelect" name="packageSelect" required></select>
+          </div>
+          <div class="form-group">
+            <label for="songCount">Número de faixas</label>
+            <input type="number" id="songCount" name="songCount" min="1" value="1" />
+          </div>
+        </div>
+        <div class="grid-three">
+          <div class="form-group">
+            <label for="productionType">Tipo de produção</label>
+            <select id="productionType" name="productionType">
+              <option value="solo">Artista solo</option>
+              <option value="duo">Dupla / duo</option>
+              <option value="banda">Banda completa</option>
+              <option value="instrumental">Instrumental</option>
+              <option value="especial">Projeto especial</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="priorityLevel">Prioridade / prazo</label>
+            <select id="priorityLevel" name="priorityLevel">
+              <option value="normal">Padrão</option>
+              <option value="priority">Prioritário</option>
+              <option value="express">Expresso</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="releaseGoal">Objetivo do projeto</label>
+            <select id="releaseGoal" name="releaseGoal">
+              <option value="lancamento">Lançamento estratégico</option>
+              <option value="catalogo">Catálogo / cauda longa</option>
+              <option value="portfolio">Portfólio / posicionamento</option>
+              <option value="evento">Evento / ocasião especial</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid-three">
+          <div class="form-group">
+            <label for="vocals">Número total de vozes</label>
+            <input type="number" id="vocals" name="vocals" min="0" value="1" />
+          </div>
+          <div class="form-group">
+            <label for="partnerStudioHours">Horas de captação em estúdio parceiro</label>
+            <input type="number" id="partnerStudioHours" name="partnerStudioHours" min="0" value="0" />
+          </div>
+          <div class="form-group">
+            <label for="revisionRounds">Rodadas extras de ajuste</label>
+            <input type="number" id="revisionRounds" name="revisionRounds" min="0" value="0" />
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">3. Arranjo</p>
+            <h2>Instrumentos e elementos</h2>
+          </div>
+          <p class="section-note">Use somente o que realmente vai consumir produção, músico, programação ou direção adicional.</p>
+        </div>
+        <div id="instrumentList" class="selection-grid"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">4. Extras</p>
+            <h2>Serviços adicionais</h2>
+          </div>
+          <p class="section-note">Ative apenas entregas que agregam valor comercial ou de lançamento.</p>
+        </div>
+        <div id="serviceGroups" class="service-groups"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">5. Observações</p>
+            <h2>Contexto do projeto</h2>
+          </div>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="references">Referências / briefing musical</label>
+            <textarea id="references" name="references" rows="4" placeholder="Ex.: referência de timbre, artista, intenção, emoção da faixa..."></textarea>
+          </div>
+          <div class="form-group">
+            <label for="notes">Observações adicionais</label>
+            <textarea id="notes" name="notes" rows="4" placeholder="Ex.: prazo de entrega, necessidade de revisão, contexto do lançamento..."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <div class="action-bar sticky-action">
+        <button type="button" id="reviewButton" class="primary-btn">Continuar para revisão</button>
+        <div class="action-info">
+          <strong id="actionIdealValue">R$ 0,00</strong>
+          <span>valor ideal atualizado</span>
+        </div>
+      </div>
+    </form>
+
+    <section id="reviewSection" class="card review-card" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">6. Revisão</p>
+          <h2>Fechamento comercial do orçamento</h2>
+        </div>
+      </div>
+
+      <div class="grid-two review-top-grid">
+        <div>
+          <label for="quoteProfile">Perfil de proposta</label>
+          <select id="quoteProfile" name="quoteProfile">
+            <option value="healthy">Piso saudável</option>
+            <option value="ideal" selected>Valor ideal Vale</option>
+            <option value="premium">Referência premium</option>
+          </select>
+          <small class="hint">O piso saudável protege o caixa. O ideal é a recomendação principal. O premium serve para prioridade, urgência ou escopo nobre.</small>
+        </div>
+        <div>
+          <label for="paymentTemplate">Condição de pagamento</label>
+          <select id="paymentTemplate" name="paymentTemplate">
+            <option value="standard">70% na aprovação + 30% na entrega</option>
+            <option value="half">50% na aprovação + 50% na entrega</option>
+            <option value="pix3">Entrada + saldo em até 3 parcelas</option>
+            <option value="custom">Personalizar no PDF</option>
+          </select>
+          <small class="hint">O padrão recomendado da Vale continua sendo 70/30.</small>
+        </div>
+      </div>
+
+      <div class="grid-two review-top-grid">
+        <div>
+          <label for="discountType">Desconto</label>
+          <select id="discountType" name="discountType">
+            <option value="none">Nenhum</option>
+            <option value="value">Valor fixo (R$)</option>
+            <option value="percentage">Percentual (%)</option>
+          </select>
+        </div>
+        <div>
+          <label for="discountValue">Valor do desconto</label>
+          <input type="number" id="discountValue" name="discountValue" min="0" value="0" disabled />
+        </div>
+      </div>
+
+      <div id="reviewContent" class="review-content"></div>
+      <div id="warningBox" class="warning-box" hidden></div>
+
+      <div class="totals-grid">
+        <div class="total-box">
+          <span>Subtotal recomendado</span>
+          <strong id="reviewSubtotal">R$ 0,00</strong>
+        </div>
+        <div class="total-box">
+          <span>Desconto aplicado</span>
+          <strong id="reviewDiscount">R$ 0,00</strong>
+        </div>
+        <div class="total-box total-box-primary">
+          <span>Total final</span>
+          <strong id="reviewTotal">R$ 0,00</strong>
+        </div>
+        <div class="total-box">
+          <span>Sinal sugerido</span>
+          <strong id="depositDisplay">R$ 0,00</strong>
+        </div>
+      </div>
+
+      <div class="payment-card">
+        <h3>Condição proposta</h3>
+        <div id="paymentBreakdown"></div>
+      </div>
+
+      <div class="action-bar">
+        <button type="button" id="backButton" class="secondary-btn">Voltar</button>
+        <button type="button" id="generatePdfButton" class="primary-btn">Gerar PDF executivo</button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <div>
+      <p>© <span id="currentYear"></span> Vale Produção — Todos os direitos reservados.</p>
+      <small id="footerBuildInfo">Versão 2.0.0 • Build 20260411-103916</small>
+    </div>
+    <a href="admin.html" class="admin-link">Área Administrativa</a>
+  </footer>
 </body>
 </html>

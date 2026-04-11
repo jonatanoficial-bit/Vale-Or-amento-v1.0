@@ -1,235 +1,216 @@
-// pdfGenerator.js
-// Módulo para criação do PDF utilizando a biblioteca jsPDF.
-// Assume que a biblioteca jsPDF está disponível em window.jspdf (injetada via CDN).
+function ensurePage(doc, state, nextHeight = 12) {
+  if (state.y + nextHeight <= 280) return;
+  doc.addPage();
+  state.y = 18;
+}
 
-export async function createPDF(data, breakdown, total, pitch) {
-  // Carrega a logo como data URL
-  const logoData = await loadLogo();
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
-  const pageWidth = doc.internal.pageSize.getWidth();
-  let currentY = 15;
-
-  // Inserir logo
-  if (logoData) {
-    doc.addImage(logoData, 'PNG', 10, currentY, 30, 30);
-  }
-  // Título
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Orçamento Personalizado', pageWidth / 2, currentY + 10, { align: 'center' });
-  doc.setFontSize(12);
-  doc.text('Vale Produções', pageWidth / 2, currentY + 18, { align: 'center' });
-  currentY += 35;
-
-  // Seção: Dados do cliente
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Dados do Cliente', 10, currentY);
-  currentY += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  const clientLines = [
-    `Nome: ${data.client.name}`,
-    `E‑mail: ${data.client.email}`,
-    `Telefone: ${data.client.phone || '-'}`
-  ];
-  clientLines.forEach((line) => {
-    doc.text(line, 12, currentY);
-    currentY += 5;
-  });
-  currentY += 2;
-
-  // Seção: Detalhes da produção
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Detalhes da Produção', 10, currentY);
-  currentY += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  doc.text(`Tipo de produção: ${productionTypeLabel(data.productionType)}`, 12, currentY);
-  currentY += 5;
-  doc.text(`Número de vozes: ${data.vocals}`, 12, currentY);
-  currentY += 5;
-  // Serviço de produção
-  if (data.productionService && data.productionService !== 'none') {
-    const prodLabel = pricingCache.producao?.[data.productionService]?.label || '';
-    if (prodLabel) {
-      doc.text(`Serviço de produção: ${prodLabel}`, 12, currentY);
-      currentY += 5;
-    }
-  }
-  // Plano de carreira
-  if (data.careerPlan && data.careerPlan !== 'none') {
-    const planLabel = pricingCache.carreira?.[data.careerPlan]?.label || '';
-    if (planLabel) {
-      doc.text(`Plano de carreira: ${planLabel}`, 12, currentY);
-      currentY += 5;
-    }
-  }
-  // Instrumentos
-  const instEntries = Object.entries(data.instruments);
-  if (instEntries.length > 0) {
-    doc.text('Instrumentos:', 12, currentY);
-    currentY += 5;
-    instEntries.forEach(([key, qty]) => {
-      doc.text(`- ${qty}× ${pricingCache.instrumentos[key].label}`, 16, currentY);
-      currentY += 5;
-    });
-  } else {
-    doc.text('Instrumentos: Nenhum', 12, currentY);
-    currentY += 5;
-  }
-  // Serviços
-  if (data.services.length > 0) {
-    doc.text('Serviços adicionais:', 12, currentY);
-    currentY += 5;
-    data.services.forEach((srvKey) => {
-      doc.text(`- ${pricingCache.servicos[srvKey].label}`, 16, currentY);
-      currentY += 5;
-    });
-  } else {
-    doc.text('Serviços adicionais: Nenhum', 12, currentY);
-    currentY += 5;
-  }
-  currentY += 2;
-
-  // Seção: Custos
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Resumo de Custos', 10, currentY);
-  currentY += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  breakdown.forEach((item) => {
-    const label = item.label;
-    const val = formatCurrency(item.value);
-    doc.text(label, 12, currentY);
-    doc.text(val, pageWidth - 12, currentY, { align: 'right' });
-    currentY += 5;
-  });
-  // Total
-  doc.setFont('helvetica', 'bold');
-  doc.text('Total', 12, currentY);
-  doc.text(formatCurrency(total), pageWidth - 12, currentY, { align: 'right' });
-  currentY += 8;
-
-  // Seção: Texto persuasivo
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('Mensagem Personalizada', 10, currentY);
-  currentY += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(11);
-  // Dividir o texto em linhas para caber na página
-  const textWidth = pageWidth - 20;
-  const pitchLines = doc.splitTextToSize(pitch, textWidth);
-  pitchLines.forEach((line) => {
-    if (currentY > 280) {
-      doc.addPage();
-      currentY = 20;
-    }
-    doc.text(line, 12, currentY);
-    currentY += 5;
-  });
-  currentY += 6;
-
-  // Data e validade
-  const today = new Date();
-  const options = { day: '2-digit', month: '2-digit', year: 'numeric' };
-  const dateStr = today.toLocaleDateString('pt-BR', options);
-  const validity = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', options);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Data de emissão:', 12, currentY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(dateStr, 45, currentY);
-  currentY += 5;
-  doc.setFont('helvetica', 'bold');
-  doc.text('Validade da proposta:', 12, currentY);
-  doc.setFont('helvetica', 'normal');
-  doc.text(validity, 60, currentY);
-  currentY += 10;
-
-  // Assinatura
-  doc.setFont('helvetica', 'italic');
-  doc.text('Assinatura (se necessário): ______________________________', 12, currentY);
-  currentY += 15;
-
-  // Observações finais
-  doc.setFont('helvetica', 'normal');
+function writeLabelValue(doc, state, label, value, width = 90) {
+  doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text('Este orçamento é uma estimativa e pode variar conforme as necessidades específicas do projeto. Para mais informações, entre em contato conosco.', 12, currentY);
-
-  // Salvar PDF
-  doc.save(`orcamento_vale_producoes_${today.getTime()}.pdf`);
+  doc.setTextColor(90, 104, 139);
+  doc.text(label, 16, state.y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(17, 24, 39);
+  const lines = doc.splitTextToSize(value || "-", width);
+  doc.text(lines, 16, state.y + 5);
+  state.y += 8 + lines.length * 4;
 }
 
-// Carrega o arquivo de logo e converte para data URL
-async function loadLogo() {
-  try {
-    const response = await fetch('assets/logo.png');
-    const blob = await response.blob();
-    return await new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.readAsDataURL(blob);
-    });
-  } catch (e) {
-    console.warn('Logo não encontrada:', e);
-    return null;
+export function generateQuotePdf(quote) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const state = { y: 18 };
+
+  doc.setFillColor(10, 17, 32);
+  doc.rect(0, 0, 210, 34, "F");
+  doc.setTextColor(237, 242, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.text("Vale Produção", 16, 18);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("Proposta comercial executiva", 16, 25);
+  doc.text(`Versão ${quote.meta.version} • Build ${quote.meta.build}`, 16, 31);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(17, 24, 39);
+  doc.text(`Orçamento ${quote.number}`, 150, 18, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.text(`Emitido em ${quote.issueDate}`, 150, 25, { align: "right" });
+  doc.text(`Validade até ${quote.validUntil}`, 150, 31, { align: "right" });
+
+  state.y = 44;
+  doc.setDrawColor(222, 226, 235);
+  doc.line(16, state.y, 194, state.y);
+  state.y += 8;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Dados do cliente", 16, state.y);
+  state.y += 6;
+
+  const clientLeftStart = state.y;
+  writeLabelValue(doc, state, "Cliente", quote.client.name);
+  writeLabelValue(doc, state, "Projeto", quote.client.artistName || quote.client.name);
+  writeLabelValue(doc, state, "E-mail", quote.client.email);
+  const leftEnd = state.y;
+
+  const rightState = { y: clientLeftStart };
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(90, 104, 139);
+  doc.text("Telefone", 115, rightState.y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(17, 24, 39);
+  doc.text(quote.client.phone || "-", 115, rightState.y + 5);
+  rightState.y += 13;
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(90, 104, 139);
+  doc.text("Segmento", 115, rightState.y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(17, 24, 39);
+  doc.text(quote.client.segmentLabel, 115, rightState.y + 5);
+  rightState.y += 13;
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(90, 104, 139);
+  doc.text("Origem", 115, rightState.y);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(17, 24, 39);
+  doc.text(quote.client.salesChannelLabel, 115, rightState.y + 5);
+
+  state.y = Math.max(leftEnd, rightState.y + 10) + 4;
+  doc.line(16, state.y, 194, state.y);
+  state.y += 8;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Escopo do projeto", 16, state.y);
+  state.y += 6;
+
+  const scopeLines = [
+    `Pacote: ${quote.packageInfo.label}`,
+    `Faixas: ${quote.client.songCount} • Tipo: ${quote.client.productionTypeLabel} • Prioridade: ${quote.client.priorityLabel}`,
+    `Objetivo: ${quote.client.releaseGoalLabel}`,
+    `Vozes: ${quote.client.vocals} • Horas de captação parceira: ${quote.client.partnerStudioHours} • Revisões extras: ${quote.client.revisionRounds}`
+  ];
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const scopeWrapped = doc.splitTextToSize(scopeLines.join("\n"), 176);
+  doc.text(scopeWrapped, 16, state.y);
+  state.y += scopeWrapped.length * 5 + 4;
+
+  if (quote.selections.instrumentLabels.length || quote.selections.serviceLabels.length) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Complementos selecionados", 16, state.y);
+    state.y += 6;
+    const complementText = [
+      quote.selections.instrumentLabels.length ? `Instrumentos / elementos: ${quote.selections.instrumentLabels.join(", ")}` : null,
+      quote.selections.serviceLabels.length ? `Serviços adicionais: ${quote.selections.serviceLabels.join(", ")}` : null
+    ].filter(Boolean).join("\n");
+    const complementWrapped = doc.splitTextToSize(complementText, 176);
+    doc.setFont("helvetica", "normal");
+    doc.text(complementWrapped, 16, state.y);
+    state.y += complementWrapped.length * 5 + 4;
   }
-}
 
-// Helper functions used in PDF generation
-function formatCurrency(value) {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
+  ensurePage(doc, state, 60);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Composição do investimento", 16, state.y);
+  state.y += 8;
 
-function productionTypeLabel(type) {
-  switch (type) {
-    case 'banda':
-      return 'Banda completa';
-    case 'solo':
-      return 'Artista solo';
-    case 'instrumental':
-      return 'Instrumental';
-    default:
-      return 'Outro';
+  doc.setFillColor(245, 247, 251);
+  doc.rect(16, state.y, 178, 8, "F");
+  doc.setTextColor(63, 74, 105);
+  doc.setFontSize(9);
+  doc.text("Item", 18, state.y + 5.5);
+  doc.text("Valor", 188, state.y + 5.5, { align: "right" });
+  state.y += 11;
+
+  doc.setTextColor(17, 24, 39);
+  doc.setFont("helvetica", "normal");
+  quote.breakdown.forEach((item) => {
+    ensurePage(doc, state, 8);
+    const lines = doc.splitTextToSize(item.label, 138);
+    doc.text(lines, 18, state.y);
+    doc.text(item.formattedValue, 188, state.y, { align: "right" });
+    state.y += Math.max(6, lines.length * 4 + 2);
+    doc.setDrawColor(235, 238, 244);
+    doc.line(18, state.y, 188, state.y);
+    state.y += 4;
+  });
+
+  state.y += 2;
+  doc.setFont("helvetica", "bold");
+  doc.text(`Perfil selecionado: ${quote.calculations.profileLabel}`, 18, state.y);
+  doc.text(quote.calculations.profileValueFormatted, 188, state.y, { align: "right" });
+  state.y += 7;
+  if (quote.calculations.discount > 0) {
+    doc.setFont("helvetica", "normal");
+    doc.text("Desconto aplicado", 18, state.y);
+    doc.text(`- ${quote.calculations.discountFormatted}`, 188, state.y, { align: "right" });
+    state.y += 7;
   }
-}
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(12);
+  doc.text("Total final", 18, state.y);
+  doc.text(quote.calculations.finalTotalFormatted, 188, state.y, { align: "right" });
+  state.y += 10;
 
-// Keep a simple cache of pricing labels so pdf generator can print them
-const pricingCache = {
-  instrumentos: {},
-  servicos: {},
-  producao: {},
-  edicao: {},
-  carreira: {}
-};
+  doc.setFillColor(237, 242, 255);
+  doc.roundedRect(16, state.y, 178, 26, 4, 4, "F");
+  doc.setTextColor(17, 24, 39);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Condição de pagamento sugerida", 20, state.y + 8);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  quote.paymentPlan.forEach((line, index) => {
+    doc.text(`${line.label}: ${line.value}`, 20, state.y + 14 + index * 5);
+  });
+  state.y += 34;
 
-// Load pricing labels once
-document.addEventListener('DOMContentLoaded', async () => {
-  try {
-    const res = await fetch('data/pricing.json');
-    const baseConfig = await res.json();
-    pricingCache.instrumentos = baseConfig.instrumentos;
-    pricingCache.servicos = baseConfig.servicos;
-    pricingCache.producao = baseConfig.producao || {};
-    pricingCache.edicao = baseConfig.edicao || {};
-    pricingCache.carreira = baseConfig.carreira || {};
-    // expansions from localStorage
-    const stored = localStorage.getItem('valeExpansions');
-    if (stored) {
-      const expansions = JSON.parse(stored);
-      Object.values(expansions).forEach((exp) => {
-        if (exp.instrumentos) Object.assign(pricingCache.instrumentos, exp.instrumentos);
-        if (exp.servicos) Object.assign(pricingCache.servicos, exp.servicos);
-        if (exp.producao) Object.assign(pricingCache.producao, exp.producao);
-        if (exp.edicao) Object.assign(pricingCache.edicao, exp.edicao);
-        if (exp.carreira) Object.assign(pricingCache.carreira, exp.carreira);
-      });
-    }
-  } catch (e) {
-    console.error('Erro ao carregar pricing para PDF:', e);
+  ensurePage(doc, state, 56);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Narrativa executiva", 16, state.y);
+  state.y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const pitchLines = doc.splitTextToSize(quote.pitch, 176);
+  doc.text(pitchLines, 16, state.y);
+  state.y += pitchLines.length * 5 + 4;
+
+  if (quote.client.references || quote.client.notes) {
+    ensurePage(doc, state, 32);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Briefing e observações", 16, state.y);
+    state.y += 6;
+    doc.setFont("helvetica", "normal");
+    const briefing = [
+      quote.client.references ? `Referências: ${quote.client.references}` : null,
+      quote.client.notes ? `Observações: ${quote.client.notes}` : null
+    ].filter(Boolean).join("\n");
+    const briefingLines = doc.splitTextToSize(briefing, 176);
+    doc.text(briefingLines, 16, state.y);
+    state.y += briefingLines.length * 5 + 4;
   }
-});
+
+  ensurePage(doc, state, 26);
+  doc.setFont("helvetica", "italic");
+  doc.setTextColor(90, 104, 139);
+  const footerLines = doc.splitTextToSize(`${quote.meta.footerNote} Proposta gerada em ${quote.meta.generatedAt} pelo sistema ${quote.meta.appName}.`, 176);
+  doc.text(footerLines, 16, state.y);
+
+  const safeName = (quote.client.artistName || quote.client.name || "cliente")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+  doc.save(`${quote.number}_${safeName || "vale-proposta"}.pdf`);
+}

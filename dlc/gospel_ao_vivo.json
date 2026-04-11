@@ -1,0 +1,17 @@
+{
+  "instruments": {
+    "coro": {
+      "label": "Coro / backing coletivo",
+      "price": 180,
+      "description": "Camada de vozes em bloco para refrão ou clima congregacional"
+    }
+  },
+  "services": {
+    "ensaio_extra": {
+      "label": "Ensaio / pré-produção extra",
+      "price": 180,
+      "unit": "sessão",
+      "category": "Pré-produção"
+    }
+  }
+}

@@ -1,66 +1,213 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Área Administrativa &ndash; Vale Produções</title>
-    <link rel="stylesheet" href="css/style.css" />
-    <script defer type="module" src="js/admin.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin - Vale Orçamento Pro</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script defer type="module" src="js/admin.js"></script>
 </head>
 <body>
-    <header class="app-header">
-        <img src="assets/logo.png" alt="Logo da Vale Produções" class="logo" />
+  <header class="app-header">
+    <div class="brand-wrap">
+      <img src="assets/logo.svg" alt="Logo da Vale Produção" class="logo" />
+      <div>
+        <p class="eyebrow">Painel executivo</p>
         <h1>Área Administrativa</h1>
-    </header>
-    <main>
-        <!-- Login Screen -->
-        <div id="adminLogin" class="card">
-            <h2>Acesso ao Administrador</h2>
-            <p>Insira a senha para acessar as ferramentas de administração.</p>
-            <div class="form-group">
-                <label for="adminPassword">Senha</label>
-                <input type="password" id="adminPassword" placeholder="Digite a senha" />
+      </div>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-primary">Versão <span data-version>2.0.0</span></span>
+      <span class="badge">Build <span data-build>20260411-103916</span></span>
+    </div>
+  </header>
+
+  <main class="layout-grid admin-layout">
+    <section id="adminLogin" class="card login-card">
+      <h2>Acesso ao administrador</h2>
+      <p>Entre para editar preços, configurações, histórico de orçamentos e expansões.</p>
+      <div class="form-group">
+        <label for="adminPassword">Senha</label>
+        <input type="password" id="adminPassword" placeholder="Digite a senha" />
+      </div>
+      <button id="adminLoginButton" class="primary-btn">Entrar</button>
+      <div id="loginError" class="error-msg" hidden>Senha incorreta. Tente novamente.</div>
+      <small class="hint">Senha padrão: <strong>admin123</strong>. Troque assim que possível.</small>
+    </section>
+
+    <div id="adminPanel" hidden class="admin-panel-grid">
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Resumo</p>
+            <h2>Configuração estratégica</h2>
+          </div>
+        </div>
+        <div id="adminMeta" class="admin-meta"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Configurações</p>
+            <h2>Parâmetros comerciais</h2>
+          </div>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="depositPercent">Sinal padrão (%)</label>
+            <input type="number" id="depositPercent" min="0" max="100" />
+          </div>
+          <div class="form-group">
+            <label for="validityDays">Validade do orçamento (dias)</label>
+            <input type="number" id="validityDays" min="1" max="60" />
+          </div>
+        </div>
+        <div class="grid-three">
+          <div class="form-group">
+            <label for="healthyFactor">Fator piso saudável</label>
+            <input type="number" id="healthyFactor" min="0.5" max="1" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label for="idealFactor">Fator ideal</label>
+            <input type="number" id="idealFactor" min="0.8" max="1.5" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label for="premiumFactor">Fator premium</label>
+            <input type="number" id="premiumFactor" min="1" max="2" step="0.01" />
+          </div>
+        </div>
+        <div class="grid-three">
+          <div class="form-group">
+            <label for="extraVoicePrice">Preço por voz extra (R$)</label>
+            <input type="number" id="extraVoicePrice" min="0" step="1" />
+          </div>
+          <div class="form-group">
+            <label for="extraRevisionPrice">Preço por revisão extra (R$)</label>
+            <input type="number" id="extraRevisionPrice" min="0" step="1" />
+          </div>
+          <div class="form-group">
+            <label for="weekendSupportPrice">Suporte extraordinário (R$)</label>
+            <input type="number" id="weekendSupportPrice" min="0" step="1" />
+          </div>
+        </div>
+        <button id="saveSettingsButton" class="primary-btn">Salvar parâmetros</button>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Tabela</p>
+            <h2>Pacotes e serviços</h2>
+          </div>
+          <p class="section-note">Os valores abaixo alimentam o cálculo ideal do orçamento.</p>
+        </div>
+        <div id="pricingTables" class="pricing-admin-tables"></div>
+        <div class="action-bar">
+          <button id="savePricingButton" class="primary-btn">Salvar preços</button>
+          <button id="resetPricingButton" class="secondary-btn">Restaurar padrão</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Expansões</p>
+            <h2>Gerenciamento de DLCs</h2>
+          </div>
+        </div>
+        <p class="section-note">Adicione pacotes específicos, instrumentos extras ou serviços especiais sem mexer no núcleo da tabela.</p>
+        <div id="expansionList" class="expansion-list"></div>
+        <button id="addExpansionBtn" class="secondary-btn">Adicionar expansão</button>
+
+        <div id="expansionModal" class="modal" hidden>
+          <div class="modal-content card">
+            <h3 id="expansionModalTitle">Nova expansão</h3>
+            <label for="expansionName">Nome da expansão</label>
+            <input type="text" id="expansionName" placeholder="Ex.: Gospel Ao Vivo" />
+            <label for="expansionJson">Conteúdo (JSON)</label>
+            <textarea id="expansionJson" rows="12" placeholder='{"services": {"ensaio_extra": {"label": "Ensaio extra", "price": 180, "category": "pré-produção", "unit": "sessão"}}}'></textarea>
+            <div class="modal-actions">
+              <button id="saveExpansionBtn" class="primary-btn">Salvar</button>
+              <button id="cancelExpansionBtn" class="secondary-btn">Cancelar</button>
             </div>
-            <button id="adminLoginButton" class="primary-btn">Entrar</button>
-            <div id="loginError" class="error-msg" hidden>Senha incorreta. Tente novamente.</div>
+          </div>
         </div>
-        <!-- Admin Panel -->
-        <div id="adminPanel" hidden>
-            <section class="card">
-                <h2>Gerenciamento de Expansões (DLC)</h2>
-                <p>Adicione ou remova expansões de conteúdo (instrumentos, serviços) que o aplicativo carregará de forma dinâmica.</p>
-                <div id="expansionList" class="expansion-list"></div>
-                <button id="addExpansionBtn" class="secondary-btn">Adicionar nova expansão</button>
-                <!-- Modal for adding/editing expansions -->
-                <div id="expansionModal" class="modal" hidden>
-                    <div class="modal-content card">
-                        <h3 id="expansionModalTitle">Nova Expansão</h3>
-                        <label for="expansionName">Nome da expansão</label>
-                        <input type="text" id="expansionName" placeholder="Ex.: Percussões Exóticas" />
-                        <label for="expansionJson">Conteúdo (JSON)</label>
-                        <textarea id="expansionJson" rows="10" placeholder='{"instrumentos": {"djembê": {"label": "Djembê", "price": 250}}}'></textarea>
-                        <div class="modal-actions">
-                            <button id="saveExpansionBtn" class="primary-btn">Salvar</button>
-                            <button id="cancelExpansionBtn" class="secondary-btn">Cancelar</button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-            <section class="card">
-                <h2>Tabela de Preços</h2>
-                <p>Exportar ou importar a tabela de preços em formato JSON.</p>
-                <button id="exportPricingBtn" class="secondary-btn">Exportar tabela</button>
-                <label class="upload-label">
-                    <span class="upload-button">Importar nova tabela</span>
-                    <input type="file" id="pricingFileInput" accept="application/json" hidden />
-                </label>
-            </section>
-            <button id="logoutBtn" class="secondary-btn">Sair</button>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Mercado</p>
+            <h2>Referências públicas usadas na calibração</h2>
+          </div>
         </div>
-    </main>
-    <footer class="app-footer">
-        <p>© <span id="currentYearAdmin"></span> Vale Produções &ndash; Todos os direitos reservados.</p>
-        <a href="index.html" class="admin-link">Voltar ao Início</a>
-    </footer>
+        <div id="marketReferenceList" class="reference-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Orçamentos</p>
+            <h2>Histórico local</h2>
+          </div>
+          <p class="section-note">Armazena no navegador em uso.</p>
+        </div>
+        <div class="action-bar">
+          <button id="exportHistoryButton" class="secondary-btn">Exportar CSV</button>
+          <button id="clearHistoryButton" class="secondary-btn danger-btn">Limpar histórico</button>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">JSON</p>
+            <h2>Importar e exportar tabela</h2>
+          </div>
+        </div>
+        <div class="action-bar wrap-actions">
+          <button id="exportPricingBtn" class="secondary-btn">Exportar tabela JSON</button>
+          <label class="upload-label">
+            <span class="upload-button">Importar tabela JSON</span>
+            <input type="file" id="pricingFileInput" accept="application/json" hidden />
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Segurança</p>
+            <h2>Trocar senha do admin</h2>
+          </div>
+        </div>
+        <div class="grid-two">
+          <div class="form-group">
+            <label for="newPassword">Nova senha</label>
+            <input type="password" id="newPassword" placeholder="Nova senha" />
+          </div>
+          <div class="form-group">
+            <label for="confirmPassword">Confirmar senha</label>
+            <input type="password" id="confirmPassword" placeholder="Confirme a nova senha" />
+          </div>
+        </div>
+        <button id="changePasswordButton" class="primary-btn">Atualizar senha</button>
+      </section>
+
+      <div class="action-bar">
+        <button id="logoutBtn" class="secondary-btn">Sair</button>
+      </div>
+    </div>
+  </main>
+
+  <footer class="app-footer">
+    <div>
+      <p>© <span id="currentYearAdmin"></span> Vale Produção — Todos os direitos reservados.</p>
+      <small id="footerBuildInfoAdmin">Versão 2.0.0 • Build 20260411-103916</small>
+    </div>
+    <a href="index.html" class="admin-link">Voltar ao gerador</a>
+  </footer>
 </body>
 </html>

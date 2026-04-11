@@ -1,10 +1,9 @@
 {
-  "expansions": [
+  "dlc": [
     {
-      "id": "percussao_exotica",
-      "name": "Percussões Exóticas",
-      "file": "percussao_exotica.json",
-      "version": "1.0.0"
+      "name": "Gospel Ao Vivo",
+      "enabled": true,
+      "file": "./gospel_ao_vivo.json"
     }
   ]
 }
